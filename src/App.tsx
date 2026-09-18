@@ -937,24 +937,32 @@ export default function App() {
     setAuthLoading(true)
     setAuthMessage('')
 
-    const result = authMode === 'signup'
-      ? await supabase.auth.signUp({
+    if (authMode === 'signup') {
+      const { data, error } = await supabase.functions.invoke('register-with-resend', {
+        body: {
           email: authEmail,
           password: authPassword,
-          options: { data: { display_name: authEmail.split('@')[0] } },
-        })
-      : await supabase.auth.signInWithPassword({
-          email: authEmail,
-          password: authPassword,
-        })
+          display_name: authEmail.split('@')[0],
+        },
+      })
 
-    if (result.error) {
-      setAuthMessage(result.error.message)
-    } else if (authMode === 'signup' && !result.data.session) {
-      setAuthMessage('Account created. Check your email to confirm your address, then sign in.')
+      if (error || !data?.ok) {
+        setAuthMessage(data?.error || error?.message || 'Could not create your account.')
+      } else {
+        setAuthMessage('Account created. Check your email to confirm your address, then sign in.')
+      }
     } else {
-      setAuthOpen(false)
-      setAuthMessage('')
+      const result = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      })
+
+      if (result.error) {
+        setAuthMessage(result.error.message)
+      } else {
+        setAuthOpen(false)
+        setAuthMessage('')
+      }
     }
 
     setAuthLoading(false)
