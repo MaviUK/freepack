@@ -420,13 +420,14 @@ export default function Bag3D({
   useEffect(() => {
     const overlays = overlaysRef.current
     if (!overlays) return
+    const overlayFaces = overlays
 
     let cancelled = false
     let artworkImage: HTMLImageElement | null = null
 
     function paint() {
       PANEL_ORDER.forEach((panel) => {
-        const overlay = overlays[panel]
+        const overlay = overlayFaces[panel]
         const config = panels[panel]
         const { canvas, ctx, texture } = overlay
         const cols = config.cols
