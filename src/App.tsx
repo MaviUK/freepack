@@ -1613,12 +1613,8 @@ export default function App() {
                   ) : (
                     <div className="account-list">
                       {accountBookings.map((booking) => {
-                        const runRelation = Array.isArray(booking.production_runs)
-                          ? booking.production_runs[0]
-                          : booking.production_runs
-                        const bagRelation = runRelation && Array.isArray(runRelation.bag_sizes)
-                          ? runRelation.bag_sizes[0]
-                          : runRelation?.bag_sizes
+                        const runRelation = firstRelation(booking.production_runs)
+                        const bagRelation = firstRelation(runRelation?.bag_sizes)
                         const statusLabel = booking.status.replaceAll('_', ' ')
 
                         return (
@@ -1652,9 +1648,7 @@ export default function App() {
                   ) : (
                     <div className="account-list">
                       {accountOrders.map((order) => {
-                        const business = Array.isArray(order.takeaway_businesses)
-                          ? order.takeaway_businesses[0]
-                          : order.takeaway_businesses
+                        const business = firstRelation(order.takeaway_businesses)
                         const boxCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
                         const bagCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes * item.bags_per_box, 0)
 
