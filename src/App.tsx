@@ -21,6 +21,8 @@ import {
 import { supabase } from './supabase'
 
 const DEMO_SQUARE_PRICE = 192
+const BAG_DISPLAY_SCALE = 1.25
+const MINI_BAG_MAX_HEIGHT = 86
 
 type Point = { row: number; col: number }
 type Rect = { top: number; left: number; bottom: number; right: number }
@@ -823,6 +825,57 @@ export default function App() {
     changePanel(PANEL_ORDER[nextIndex])
   }
 
+  function pointFromPointerEvent(event: React.PointerEvent<HTMLElement>): Point | null {
+    const element = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null
+    const cell = element?.closest<HTMLElement>('[data-grid-cell="true"]')
+    if (!cell) return null
+
+    const row = Number(cell.dataset.row)
+    const col = Number(cell.dataset.col)
+    if (!Number.isInteger(row) || !Number.isInteger(col)) return null
+    return { row, col }
+  }
+
+  function handleGridPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    const point = pointFromPointerEvent(event)
+    if (!point || soldCells.has(`${point.row}-${point.col}`)) return
+
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const canExtendSingleCell =
+      selection &&
+      !artwork &&
+      selection.top === selection.bottom &&
+      selection.left === selection.right &&
+      (selection.top !== point.row || selection.left !== point.col)
+
+    if (canExtendSingleCell) {
+      const anchor = { row: selection.top, col: selection.left }
+      setDragStart(anchor)
+      setPreview(makeRect(anchor, point))
+      return
+    }
+
+    startSelection(point)
+  }
+
+  function handleGridPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragStart) return
+    const point = pointFromPointerEvent(event)
+    if (point) extendSelection(point)
+  }
+
+  function handleGridPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragStart) return
+    event.preventDefault()
+    const point = pointFromPointerEvent(event) ?? dragStart
+    finishSelection(point)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
   function startSelection(point: Point) {
     const key = `${point.row}-${point.col}`
     if (soldCells.has(key)) return
@@ -1151,7 +1204,13 @@ export default function App() {
           <div className="takeaway-products">
             {runs.map((item) => (
               <article className="takeaway-product" key={item.id}>
-                <div className="mini-bag" style={{ aspectRatio: `${item.faceWidth} / ${item.height}` }}>
+                <div
+                  className="mini-bag"
+                  style={{
+                    width: `${(item.faceWidth / item.height) * ((item.height / 413) * MINI_BAG_MAX_HEIGHT)}px`,
+                    height: `${(item.height / 413) * MINI_BAG_MAX_HEIGHT}px`,
+                  }}
+                >
                   <span>{item.size}</span>
                 </div>
                 <div className="takeaway-product-copy">
@@ -1325,7 +1384,7 @@ export default function App() {
             className={`bag bag-${panelKey}`}
             style={{
               aspectRatio: `${panel.widthMm} / ${run.height}`,
-              width: `min(${Math.max(235, Math.min(455, panel.widthMm * 1.8))}px, 100%)`,
+              width: `min(${panel.widthMm * BAG_DISPLAY_SCALE}px, calc(100vw - 48px))`,
             }}
           >
             <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · {panel.label.toUpperCase()}</div>
@@ -1333,7 +1392,13 @@ export default function App() {
             <div
               className="grid"
               aria-label={`${panel.label} advertising grid selector`}
-              onPointerLeave={() => dragStart && setDragStart(null)}
+              onPointerDown={handleGridPointerDown}
+              onPointerMove={handleGridPointerMove}
+              onPointerUp={handleGridPointerUp}
+              onPointerCancel={() => {
+                setDragStart(null)
+                setPreview(selection)
+              }}
               style={{
                 gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
                 gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
@@ -1361,15 +1426,9 @@ export default function App() {
                       inPreview ? (previewBlocked ? 'blocked-preview' : 'selection-preview') : '',
                     ].join(' ')}
                     aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
-                    onPointerDown={(event) => {
-                      event.preventDefault()
-                      startSelection({ row, col })
-                    }}
-                    onPointerEnter={() => extendSelection({ row, col })}
-                    onPointerUp={(event) => {
-                      event.preventDefault()
-                      finishSelection({ row, col })
-                    }}
+                    data-grid-cell="true"
+                    data-row={row}
+                    data-col={col}
                   >
                     {sold ? <><Check size={11} /> SOLD</> : '+'}
                   </button>
@@ -1424,7 +1483,7 @@ export default function App() {
             <div className="selection-warning">That rectangle includes space already sold.</div>
           )}
           <p className="bag-help">
-            All four printable faces are now live. Switching face clears the current draft selection.
+            All four printable faces are live. Drag across squares, or tap one square then another, to create a rectangular advert.
           </p>
         </div>
       </section>
