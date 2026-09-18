@@ -225,6 +225,11 @@ function shapeLabel(rect: Rect | null) {
   return `${rect.right - rect.left + 1} × ${rect.bottom - rect.top + 1}`
 }
 
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
+}
+
 function gridCount(widthMm: number, heightMm: number) {
   const cols = Math.floor((widthMm - 20 + 3) / 33)
   const rows = Math.floor((heightMm - 20 + 3) / 33)
@@ -404,6 +409,7 @@ export default function App() {
   useEffect(() => {
     if (!userId || !paymentSessionId) return
 
+    const sessionId = paymentSessionId
     let cancelled = false
     let attempts = 0
     let timer: number | undefined
@@ -414,7 +420,7 @@ export default function App() {
       const { data, error } = await supabase
         .from('ad_bookings')
         .select('id,status,total_pence')
-        .eq('stripe_checkout_session_id', paymentSessionId)
+        .eq('stripe_checkout_session_id', sessionId)
         .maybeSingle()
 
       if (cancelled) return
@@ -533,7 +539,7 @@ export default function App() {
             square_count,
             total_pence,
             created_at,
-            profiles (display_name),
+            profiles!ad_bookings_user_id_fkey (display_name),
             production_runs (
               run_code,
               bag_sizes (name)
@@ -1458,9 +1464,9 @@ export default function App() {
                   <div className="admin-list">
                     {adminBookings.length === 0 && <p className="account-empty">No advertising bookings yet.</p>}
                     {adminBookings.map((booking) => {
-                      const runRelation = Array.isArray(booking.production_runs) ? booking.production_runs[0] : booking.production_runs
-                      const bagRelation = runRelation && Array.isArray(runRelation.bag_sizes) ? runRelation.bag_sizes[0] : runRelation?.bag_sizes
-                      const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles
+                      const runRelation = firstRelation(booking.production_runs)
+                      const bagRelation = firstRelation(runRelation?.bag_sizes)
+                      const profile = firstRelation(booking.profiles)
 
                       return (
                         <article className="admin-item" key={booking.id}>
@@ -1498,7 +1504,7 @@ export default function App() {
                   <div className="admin-list compact">
                     {adminOrders.length === 0 && <p className="account-empty">No takeaway orders yet.</p>}
                     {adminOrders.map((order) => {
-                      const business = Array.isArray(order.takeaway_businesses) ? order.takeaway_businesses[0] : order.takeaway_businesses
+                      const business = firstRelation(order.takeaway_businesses)
                       const boxes = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
 
                       return (
@@ -1532,7 +1538,7 @@ export default function App() {
 
                   <div className="admin-list compact">
                     {adminRuns.map((item) => {
-                      const bag = Array.isArray(item.bag_sizes) ? item.bag_sizes[0] : item.bag_sizes
+                      const bag = firstRelation(item.bag_sizes)
                       return (
                         <article className="admin-item order-admin-item" key={item.id}>
                           <div className="admin-item-copy">
