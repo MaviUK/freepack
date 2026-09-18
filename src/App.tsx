@@ -9,6 +9,8 @@ import {
   Megaphone,
   PackageCheck,
   RotateCcw,
+  ShoppingBag,
+  X,
 } from 'lucide-react'
 
 const DEMO_SQUARE_PRICE = 192
@@ -155,6 +157,7 @@ export default function App() {
   const [preview, setPreview] = useState<Rect | null>(null)
   const [selection, setSelection] = useState<Rect | null>(null)
   const [artwork, setArtwork] = useState<string | null>(null)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const run = BAG_RUNS.find((item) => item.id === runId) ?? BAG_RUNS[2]
@@ -185,6 +188,7 @@ export default function App() {
     setPreview(null)
     setSelection(null)
     setArtwork(null)
+    setCheckoutOpen(false)
   }
 
   function changeRun(id: string) {
@@ -421,6 +425,15 @@ export default function App() {
               <RotateCcw size={16} /> Reset
             </button>
           </div>
+
+          <button
+            className="button checkout-button"
+            disabled={!selection || !artwork}
+            onClick={() => setCheckoutOpen(true)}
+          >
+            Review & continue <ArrowRight size={17} />
+          </button>
+          {!artwork && selection && <p className="checkout-hint">Upload artwork to continue.</p>}
         </div>
 
         <div className="bag-wrap">
@@ -537,6 +550,58 @@ export default function App() {
           </p>
         </div>
       </section>
+
+      {checkoutOpen && selection && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setCheckoutOpen(false)}>
+          <section
+            className="checkout-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Review advertising space"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setCheckoutOpen(false)} aria-label="Close review">
+              <X size={20} />
+            </button>
+
+            <div className="checkout-icon"><ShoppingBag size={22} /></div>
+            <p className="kicker">REVIEW YOUR AD SPACE</p>
+            <h2>{run.size} bag · {panel.label}</h2>
+            <p className="checkout-intro">
+              Check the space and artwork before moving to account details and payment.
+            </p>
+
+            <div className="checkout-preview">
+              <div
+                className="checkout-art"
+                style={{ backgroundImage: artwork ? `url("${artwork}")` : undefined }}
+              />
+              <div>
+                <span>Run</span>
+                <strong>{run.id}</strong>
+                <span>Estimated start</span>
+                <strong>{run.estimatedStart}</strong>
+              </div>
+            </div>
+
+            <div className="checkout-lines">
+              <div><span>Bag size</span><strong>{run.size}</strong></div>
+              <div><span>Bag face</span><strong>{panel.label}</strong></div>
+              <div><span>Ad shape</span><strong>{shapeLabel(selection)}</strong></div>
+              <div><span>3 cm squares</span><strong>{selectedCount}</strong></div>
+              <div><span>Prototype price</span><strong>£{(selectedCount * DEMO_SQUARE_PRICE).toLocaleString()}</strong></div>
+            </div>
+
+            <div className="checkout-notice">
+              This is the prototype checkout flow. Live reservations, advertiser accounts and payment will be connected to the backend next.
+            </div>
+
+            <button className="button button-dark modal-primary" onClick={() => setCheckoutOpen(false)}>
+              Looks good
+            </button>
+          </section>
+        </div>
+      )}
 
       <footer className="shell">
         <span className="brand">freepack.</span>
