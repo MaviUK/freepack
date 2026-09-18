@@ -334,11 +334,7 @@ export default function Bag3D({
       if (!drag.moved || !bagGroupRef.current) return
 
       bagGroupRef.current.rotation.y += dx * 0.0085
-      bagGroupRef.current.rotation.x = THREE.MathUtils.clamp(
-        bagGroupRef.current.rotation.x + dy * 0.0065,
-        -0.82,
-        0.82,
-      )
+      bagGroupRef.current.rotation.x += dy * 0.0065
     }
 
     function onPointerUp(event: PointerEvent) {
@@ -527,7 +523,7 @@ export default function Bag3D({
     if (!bag) return
 
     bag.rotation.y += horizontal
-    bag.rotation.x = THREE.MathUtils.clamp(bag.rotation.x + vertical, -0.82, 0.82)
+    bag.rotation.x += vertical
   }
 
   return (
@@ -568,7 +564,7 @@ export default function Bag3D({
       </button>
 
       <div className="bag3d-hint">
-        Drag to rotate · scroll/pinch to zoom · tap a grid square to select
+        Drag to rotate in any direction · scroll to zoom · tap a grid square to select
       </div>
     </div>
   )
