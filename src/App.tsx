@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Truck,
   UserRound,
+  WalletCards,
   X,
 } from 'lucide-react'
 import { supabase } from './supabase'
@@ -30,6 +31,43 @@ type PanelConfig = {
   cols: number
   rows: number
   widthMm: number
+}
+
+type AccountBooking = {
+  id: string
+  status: string
+  panel: PanelKey
+  square_count: number
+  total_pence: number
+  reserved_until: string | null
+  paid_at: string | null
+  created_at: string
+  production_runs: {
+    run_code: string
+    bag_sizes: { name: string } | { name: string }[] | null
+  } | {
+    run_code: string
+    bag_sizes: { name: string } | { name: string }[] | null
+  }[] | null
+}
+
+type AccountOrder = {
+  id: string
+  status: string
+  created_at: string
+  submitted_at: string | null
+  takeaway_businesses: { business_name: string } | { business_name: string }[] | null
+  takeaway_order_items: Array<{
+    boxes: number
+    bags_per_box: number
+    production_runs: {
+      run_code: string
+      bag_sizes: { name: string } | { name: string }[] | null
+    } | {
+      run_code: string
+      bag_sizes: { name: string } | { name: string }[] | null
+    }[] | null
+  }>
 }
 
 type BagRun = {
@@ -180,6 +218,12 @@ export default function App() {
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [paymentBanner, setPaymentBanner] = useState('')
+  const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [accountLoading, setAccountLoading] = useState(false)
+  const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
+  const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
+  const [accountError, setAccountError] = useState('')
   const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
   const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
   const [takeawayMessage, setTakeawayMessage] = useState('')
@@ -219,8 +263,11 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const payment = params.get('payment')
+    const sessionId = params.get('session_id')
+    setPaymentSessionId(sessionId)
+
     if (payment === 'success') {
-      setPaymentBanner('Payment received. Your advertising space is being confirmed.')
+      setPaymentBanner('Payment received. Confirming your advertising space…')
     } else if (payment === 'cancelled') {
       setPaymentBanner('Payment was cancelled. Your reserved space remains held until the reservation expires.')
     }
@@ -280,6 +327,116 @@ export default function App() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  useEffect(() => {
+    if (!userId || !paymentSessionId) return
+
+    let cancelled = false
+    let attempts = 0
+    let timer: number | undefined
+
+    async function confirmPayment() {
+      attempts += 1
+
+      const { data, error } = await supabase
+        .from('ad_bookings')
+        .select('id,status,total_pence')
+        .eq('stripe_checkout_session_id', paymentSessionId)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (error) {
+        setPaymentBanner('Payment was received by Stripe. Sign in later to check the booking status.')
+        return
+      }
+
+      if (data?.status === 'paid') {
+        setPaymentBanner(`Payment confirmed — your advertising space is secured for £${(data.total_pence / 100).toFixed(2)}.`)
+        window.history.replaceState({}, '', `${window.location.pathname}#advertise`)
+        return
+      }
+
+      if (attempts < 6) {
+        timer = window.setTimeout(confirmPayment, 1500)
+      } else {
+        setPaymentBanner('Payment received. Confirmation is taking a little longer than expected; it will appear in your account shortly.')
+      }
+    }
+
+    confirmPayment()
+
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [userId, paymentSessionId])
+
+  useEffect(() => {
+    if (!accountOpen || !userId) return
+
+    let cancelled = false
+
+    async function loadAccountData() {
+      setAccountLoading(true)
+      setAccountError('')
+
+      const [bookingsResult, ordersResult] = await Promise.all([
+        supabase
+          .from('ad_bookings')
+          .select(`
+            id,
+            status,
+            panel,
+            square_count,
+            total_pence,
+            reserved_until,
+            paid_at,
+            created_at,
+            production_runs (
+              run_code,
+              bag_sizes (name)
+            )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('takeaway_orders')
+          .select(`
+            id,
+            status,
+            created_at,
+            submitted_at,
+            takeaway_businesses (business_name),
+            takeaway_order_items (
+              boxes,
+              bags_per_box,
+              production_runs (
+                run_code,
+                bag_sizes (name)
+              )
+            )
+          `)
+          .order('created_at', { ascending: false }),
+      ])
+
+      if (cancelled) return
+
+      if (bookingsResult.error || ordersResult.error) {
+        setAccountError(bookingsResult.error?.message ?? ordersResult.error?.message ?? 'Could not load your account.')
+      } else {
+        setAccountBookings((bookingsResult.data ?? []) as AccountBooking[])
+        setAccountOrders((ordersResult.data ?? []) as AccountOrder[])
+      }
+
+      setAccountLoading(false)
+    }
+
+    loadAccountData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [accountOpen, userId])
 
   useEffect(() => {
     let cancelled = false
@@ -654,8 +811,8 @@ export default function App() {
           <a href="#advertise">Advertise</a>
         </nav>
         {userId ? (
-          <button className="button button-dark" onClick={() => supabase.auth.signOut()}>
-            Sign out
+          <button className="button button-dark" onClick={() => setAccountOpen(true)}>
+            My account
           </button>
         ) : (
           <button className="button button-dark" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>
@@ -1027,6 +1184,121 @@ export default function App() {
           </p>
         </div>
       </section>
+
+      {accountOpen && userId && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAccountOpen(false)}>
+          <section
+            className="checkout-modal account-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="My Freepack account"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setAccountOpen(false)} aria-label="Close account">
+              <X size={20} />
+            </button>
+
+            <div className="checkout-icon"><UserRound size={22} /></div>
+            <p className="kicker">MY FREEPACK</p>
+            <div className="account-title-row">
+              <h2>Your account</h2>
+              <button
+                className="account-signout"
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  setAccountOpen(false)
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+            <p className="checkout-intro">Track your advertising bookings and free takeaway bag orders in one place.</p>
+
+            {accountLoading && <div className="account-loading">Loading your activity…</div>}
+            {accountError && <div className="auth-message">{accountError}</div>}
+
+            {!accountLoading && !accountError && (
+              <div className="account-sections">
+                <section className="account-section">
+                  <div className="account-section-heading">
+                    <WalletCards size={18} />
+                    <div>
+                      <strong>Advertising</strong>
+                      <span>{accountBookings.length} booking{accountBookings.length === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
+
+                  {accountBookings.length === 0 ? (
+                    <p className="account-empty">You haven’t booked any advertising space yet.</p>
+                  ) : (
+                    <div className="account-list">
+                      {accountBookings.map((booking) => {
+                        const runRelation = Array.isArray(booking.production_runs)
+                          ? booking.production_runs[0]
+                          : booking.production_runs
+                        const bagRelation = runRelation && Array.isArray(runRelation.bag_sizes)
+                          ? runRelation.bag_sizes[0]
+                          : runRelation?.bag_sizes
+                        const statusLabel = booking.status.replaceAll('_', ' ')
+
+                        return (
+                          <article className="account-item" key={booking.id}>
+                            <div>
+                              <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'}</strong>
+                              <span>{booking.panel} · {booking.square_count} square{booking.square_count === 1 ? '' : 's'}</span>
+                            </div>
+                            <div className="account-item-right">
+                              <strong>£{(booking.total_pence / 100).toFixed(2)}</strong>
+                              <span className={`status-pill status-${booking.status}`}>{statusLabel}</span>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <section className="account-section">
+                  <div className="account-section-heading">
+                    <PackageCheck size={18} />
+                    <div>
+                      <strong>Free bag orders</strong>
+                      <span>{accountOrders.length} order{accountOrders.length === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
+
+                  {accountOrders.length === 0 ? (
+                    <p className="account-empty">You haven’t submitted any free bag orders yet.</p>
+                  ) : (
+                    <div className="account-list">
+                      {accountOrders.map((order) => {
+                        const business = Array.isArray(order.takeaway_businesses)
+                          ? order.takeaway_businesses[0]
+                          : order.takeaway_businesses
+                        const boxCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
+                        const bagCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes * item.bags_per_box, 0)
+
+                        return (
+                          <article className="account-item" key={order.id}>
+                            <div>
+                              <strong>{business?.business_name ?? 'Takeaway order'}</strong>
+                              <span>{boxCount} box{boxCount === 1 ? '' : 'es'} · {bagCount.toLocaleString()} bags</span>
+                            </div>
+                            <div className="account-item-right">
+                              <strong>£0.00</strong>
+                              <span className={`status-pill status-${order.status}`}>{order.status.replaceAll('_', ' ')}</span>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {takeawayCheckoutOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setTakeawayCheckoutOpen(false)}>
