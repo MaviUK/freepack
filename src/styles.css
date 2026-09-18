@@ -213,7 +213,7 @@ h1 em { color: #5f7156; font-family: Georgia, serif; font-weight: 500; }
 .upload-button { background:#eef2ea; color:#171713; }
 .reset-button { border:0; color:#b8b7af; background:transparent; display:inline-flex; gap:6px; align-items:center; padding:12px; }
 
-.bag-wrap { display:grid; place-items:center; min-height:760px; align-content:center; }
+.bag-wrap { display:grid; place-items:center; min-height:700px; align-content:center; }
 .surface-control {
   width:min(330px,100%);
   margin-bottom:16px;
@@ -237,8 +237,8 @@ h1 em { color: #5f7156; font-family: Georgia, serif; font-weight: 500; }
 
 .bag {
   max-width:100%;
-  max-height:650px;
-  min-height:420px;
+  max-height:none;
+  min-height:0;
   background: #c7a875;
   position:relative;
   padding: 32px 25px 23px;
@@ -594,9 +594,10 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   align-items:center;
 }
 .mini-bag {
-  width:54px;
-  max-height:78px;
-  min-height:62px;
+  max-width:54px;
+  max-height:86px;
+  min-width:0;
+  min-height:0;
   justify-self:center;
   background:#c7a875;
   box-shadow:inset -8px 0 rgba(79,54,23,.06);
@@ -1036,4 +1037,14 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
 
 @media (max-width:520px) {
   .nav-actions .admin-nav-button { display:none; }
+}
+
+
+.grid {
+  -webkit-user-select:none;
+  user-select:none;
+  overscroll-behavior:contain;
+}
+.grid-cell {
+  touch-action:none;
 }
