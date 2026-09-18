@@ -258,8 +258,7 @@ export default function App() {
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [preview, setPreview] = useState<Rect | null>(null)
   const [selection, setSelection] = useState<Rect | null>(null)
-  const [shapeCols, setShapeCols] = useState(1)
-  const [shapeRows, setShapeRows] = useState(1)
+  const [selectionAnchor, setSelectionAnchor] = useState<Point | null>(null)
   const [placementMessage, setPlacementMessage] = useState('')
   const [artwork, setArtwork] = useState<string | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
@@ -804,6 +803,7 @@ export default function App() {
     setDragStart(null)
     setPreview(null)
     setSelection(null)
+    setSelectionAnchor(null)
     setPlacementMessage('')
     setArtwork(null)
     setArtworkFile(null)
@@ -815,16 +815,11 @@ export default function App() {
   function changeRun(id: string) {
     setRunId(id)
     setPanelKey('front')
-    setShapeCols(1)
-    setShapeRows(1)
     clearSelection()
   }
 
   function changePanel(key: PanelKey) {
-    const nextPanel = panels[key]
     setPanelKey(key)
-    setShapeCols((current) => Math.min(current, nextPanel.cols))
-    setShapeRows((current) => Math.min(current, nextPanel.rows))
     clearSelection()
   }
 
@@ -834,35 +829,36 @@ export default function App() {
     changePanel(PANEL_ORDER[nextIndex])
   }
 
-  function chooseShape(cols: number, rows: number) {
-    setShapeCols(cols)
-    setShapeRows(rows)
-    clearSelection()
-  }
+  function chooseGridCell(point: Point) {
+    const key = `${point.row}-${point.col}`
+    if (soldCells.has(key)) return
 
-  function placeSelectedShape(point: Point) {
-    const rect: Rect = {
-      top: point.row,
-      left: point.col,
-      bottom: point.row + shapeRows - 1,
-      right: point.col + shapeCols - 1,
-    }
-
-    if (rect.right >= panel.cols || rect.bottom >= panel.rows) {
-      setPlacementMessage(`A ${shapeCols} × ${shapeRows} advert will not fit from that square. Choose a position further up or left.`)
+    if (!selectionAnchor) {
+      const rect = makeRect(point, point)
+      setSelectionAnchor(point)
+      setPreview(rect)
+      setSelection(rect)
+      setPlacementMessage('Tap another available square to make the advert larger, or upload artwork to keep 1 × 1.')
+      setArtwork(null)
+      setArtworkFile(null)
+      setReservationMessage('')
+      setActiveBookingId(null)
+      setCheckoutOpen(false)
       return
     }
 
-    const blocked = rectCells(rect).some((key) => soldCells.has(key))
+    const rect = makeRect(selectionAnchor, point)
+    const blocked = rectCells(rect).some((cellKey) => soldCells.has(cellKey))
+
     if (blocked) {
-      setPlacementMessage('That position overlaps advertising space that is already taken.')
+      setPlacementMessage('That rectangle crosses space that is already taken. Choose a different end square.')
       return
     }
 
-    setPlacementMessage('')
-    setDragStart(null)
     setPreview(rect)
     setSelection(rect)
+    setSelectionAnchor(null)
+    setPlacementMessage('')
     setArtwork(null)
     setArtworkFile(null)
     setReservationMessage('')
@@ -1235,8 +1231,8 @@ export default function App() {
           <p className="kicker">INTERACTIVE AD SELECTOR</p>
           <h2>Choose the exact<br />space you want.</h2>
           <p className="muted">
-            Choose the advert size first — 1 × 1, 1 × 2, 2 × 1, 2 × 2 and so on —
-            then tap an available square to place that exact rectangle on the bag.
+            Choose your space directly on the bag. Tap one available square for 1 × 1,
+            then tap another square to expand it into 1 × 2, 2 × 1, 2 × 2 and larger rectangles.
           </p>
 
           {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
@@ -1277,51 +1273,6 @@ export default function App() {
                 </button>
               )
             })}
-          </div>
-
-          <div className="ad-size-picker">
-            <div className="ad-size-picker-head">
-              <div>
-                <span className="run-label">AD SIZE</span>
-                <strong>{shapeCols} × {shapeRows}</strong>
-                <small>{shapeCols * 3} × {shapeRows * 3} cm</small>
-              </div>
-              <span>{shapeCols * shapeRows} square{shapeCols * shapeRows === 1 ? '' : 's'}</span>
-            </div>
-
-            <div className="size-axis">
-              <span>Width</span>
-              <div>
-                {Array.from({ length: panel.cols }, (_, index) => index + 1).map((value) => (
-                  <button
-                    key={`width-${value}`}
-                    className={shapeCols === value ? 'active' : ''}
-                    onClick={() => chooseShape(value, shapeRows)}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="size-axis">
-              <span>Height</span>
-              <div>
-                {Array.from({ length: panel.rows }, (_, index) => index + 1).map((value) => (
-                  <button
-                    key={`height-${value}`}
-                    className={shapeRows === value ? 'active' : ''}
-                    onClick={() => chooseShape(shapeCols, value)}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <small className="size-picker-help">
-              Example: width 2 + height 1 = a 2 × 1 advert. Now tap where its top-left corner should sit.
-            </small>
           </div>
 
           <div className="run-facts">
@@ -1431,7 +1382,7 @@ export default function App() {
                       inPreview ? (previewBlocked ? 'blocked-preview' : 'selection-preview') : '',
                     ].join(' ')}
                     aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
-                    onClick={() => !sold && placeSelectedShape({ row, col })}
+                    onClick={() => !sold && chooseGridCell({ row, col })}
                   >
                     {sold ? <><Check size={11} /> SOLD</> : '+'}
                   </button>
@@ -1486,7 +1437,11 @@ export default function App() {
             <div className="selection-warning">{placementMessage}</div>
           )}
           <p className="bag-help">
-            Selected size: {shapeCols} × {shapeRows}. Tap the square where the advert's top-left corner should start.
+            {selectionAnchor
+              ? 'Start selected. Tap another available square to set the opposite corner.'
+              : selection
+                ? `Selected: ${shapeLabel(selection)}. Tap a new square to start again, or upload artwork.`
+                : 'Tap an available square to start. Tap a second square to make a larger rectangle.'}
           </p>
         </div>
       </section>
