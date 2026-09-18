@@ -964,3 +964,76 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   .account-item { grid-template-columns:1fr; }
   .account-item-right { justify-items:start; grid-auto-flow:column; justify-content:start; align-items:center; }
 }
+
+
+.nav-actions { display:flex; align-items:center; gap:8px; }
+.admin-nav-button { background:#fff; }
+
+.admin-modal { width:min(900px,100%); }
+.admin-sections { display:grid; gap:18px; }
+.admin-section {
+  border:1px solid rgba(23,23,19,.10);
+  border-radius:18px;
+  background:#fff;
+  padding:16px;
+}
+.admin-list { display:grid; }
+.admin-item {
+  display:grid;
+  grid-template-columns:78px 1fr auto;
+  gap:14px;
+  align-items:center;
+  padding:14px 0;
+  border-bottom:1px solid rgba(23,23,19,.07);
+}
+.admin-item:last-child { border-bottom:0; padding-bottom:2px; }
+.admin-item img,
+.admin-art-placeholder {
+  width:78px;
+  aspect-ratio:1;
+  border-radius:12px;
+  border:1px solid rgba(23,23,19,.08);
+  background:#f5f2eb;
+  object-fit:contain;
+}
+.admin-art-placeholder {
+  display:grid;
+  place-items:center;
+  color:#8b887f;
+  font-size:9px;
+  text-align:center;
+}
+.admin-item-copy { display:grid; gap:4px; min-width:0; }
+.admin-item-copy strong { font-size:13px; }
+.admin-item-copy span { color:#858279; font-size:10px; text-transform:capitalize; }
+.admin-item-copy small { color:#756f64; font-size:10px; line-height:1.4; }
+.admin-actions { display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+.admin-actions button,
+.admin-item select {
+  border:1px solid rgba(23,23,19,.11);
+  border-radius:9px;
+  background:#f5f2eb;
+  color:#171713;
+  padding:8px 9px;
+  font-size:10px;
+  font-weight:800;
+}
+.admin-actions button:first-child { background:#dfe7d8; color:#40513a; }
+.admin-list.compact .admin-item { grid-template-columns:1fr auto; }
+.order-admin-item select { min-width:160px; }
+.status-approved { background:#e0eadb; color:#476440; }
+.status-changes_requested { background:#eee8d6; color:#766338; }
+.status-rejected { background:#efe0dd; color:#81463b; }
+
+@media (max-width:700px) {
+  .admin-item { grid-template-columns:64px 1fr; align-items:start; }
+  .admin-item img,
+  .admin-art-placeholder { width:64px; }
+  .admin-actions { grid-column:1 / -1; justify-content:flex-start; }
+  .admin-list.compact .admin-item { grid-template-columns:1fr; }
+  .order-admin-item select { width:100%; min-width:0; }
+}
+
+@media (max-width:520px) {
+  .nav-actions .admin-nav-button { display:none; }
+}
