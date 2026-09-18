@@ -971,7 +971,32 @@ export default function App() {
       })
 
       if (error || !data?.ok) {
-        setAuthMessage(data?.error || error?.message || 'Could not create your account.')
+        let functionMessage = data?.error || error?.message || 'Could not create your account.'
+
+        const context = (error as { context?: Response } | null)?.context
+        if (context) {
+          try {
+            const body = await context.clone().json() as { error?: string }
+            if (body?.error) functionMessage = body.error
+          } catch {
+            // Keep the fallback message if the response body is not JSON.
+          }
+        }
+
+        const signInAttempt = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        })
+
+        if (!signInAttempt.error) {
+          setAuthOpen(false)
+          setAuthMessage('')
+        } else if (/already exists|already registered|sign in instead/i.test(functionMessage)) {
+          setAuthMode('signin')
+          setAuthMessage('That email already has a FreePack account. Sign in with your existing password.')
+        } else {
+          setAuthMessage(functionMessage)
+        }
       } else {
         setAuthMessage('Account created. Check your email to confirm your address, then sign in.')
       }
