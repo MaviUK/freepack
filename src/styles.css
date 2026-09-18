@@ -692,3 +692,54 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   .quantity-control { grid-column:1 / -1; justify-self:stretch; grid-template-columns:1fr 50px 1fr; }
   .quantity-control button { width:100%; }
 }
+
+
+.auth-modal { width:min(460px,100%); }
+.auth-form { display:grid; gap:14px; margin-top:18px; }
+.auth-form label {
+  display:grid;
+  gap:7px;
+  color:#56544d;
+  font-size:12px;
+  font-weight:750;
+}
+.auth-form input {
+  width:100%;
+  border:1px solid rgba(23,23,19,.13);
+  border-radius:12px;
+  background:#fff;
+  color:#171713;
+  padding:13px 14px;
+  outline:none;
+}
+.auth-form input:focus { border-color:#879b7c; box-shadow:0 0 0 3px rgba(135,155,124,.15); }
+.auth-message {
+  border-radius:12px;
+  background:#ece7db;
+  color:#5f5b50;
+  padding:11px 12px;
+  font-size:12px;
+  line-height:1.45;
+}
+.auth-switch {
+  width:100%;
+  border:0;
+  background:transparent;
+  color:#5f7156;
+  font-weight:800;
+  font-size:12px;
+  padding:14px 8px 0;
+}
+.reservation-message {
+  margin:14px 0 0;
+  border-radius:12px;
+  background:#f3e4e1;
+  color:#7c3f35;
+  padding:12px 13px;
+  line-height:1.45;
+  font-size:12px;
+}
+.reservation-message.success {
+  background:#e4eadf;
+  color:#486141;
+}
