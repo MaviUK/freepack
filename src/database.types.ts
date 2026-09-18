@@ -17,6 +17,10 @@ export type Database = {
       ad_bookings: {
         Row: {
           artwork_path: string | null
+          artwork_review_notes: string | null
+          artwork_review_status: Database["public"]["Enums"]["artwork_review_status"]
+          artwork_reviewed_at: string | null
+          artwork_reviewed_by: string | null
           created_at: string
           height_cells: number
           id: string
@@ -39,6 +43,10 @@ export type Database = {
         }
         Insert: {
           artwork_path?: string | null
+          artwork_review_notes?: string | null
+          artwork_review_status?: Database["public"]["Enums"]["artwork_review_status"]
+          artwork_reviewed_at?: string | null
+          artwork_reviewed_by?: string | null
           created_at?: string
           height_cells: number
           id?: string
@@ -61,6 +69,10 @@ export type Database = {
         }
         Update: {
           artwork_path?: string | null
+          artwork_review_notes?: string | null
+          artwork_review_status?: Database["public"]["Enums"]["artwork_review_status"]
+          artwork_reviewed_at?: string | null
+          artwork_reviewed_by?: string | null
           created_at?: string
           height_cells?: number
           id?: string
@@ -82,6 +94,13 @@ export type Database = {
           width_cells?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "ad_bookings_artwork_reviewed_by_fkey"
+            columns: ["artwork_reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ad_bookings_production_run_id_fkey"
             columns: ["production_run_id"]
@@ -496,6 +515,10 @@ export type Database = {
         }
         Returns: {
           artwork_path: string | null
+          artwork_review_notes: string | null
+          artwork_review_status: Database["public"]["Enums"]["artwork_review_status"]
+          artwork_reviewed_at: string | null
+          artwork_reviewed_by: string | null
           created_at: string
           height_cells: number
           id: string
@@ -554,6 +577,11 @@ export type Database = {
     }
     Enums: {
       account_type: "takeaway" | "advertiser" | "admin"
+      artwork_review_status:
+        | "pending"
+        | "approved"
+        | "changes_requested"
+        | "rejected"
       booking_status: "reserved" | "paid" | "expired" | "cancelled" | "refunded"
       cell_status: "available" | "reserved" | "sold"
       order_status:
@@ -703,6 +731,12 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["takeaway", "advertiser", "admin"],
+      artwork_review_status: [
+        "pending",
+        "approved",
+        "changes_requested",
+        "rejected",
+      ],
       booking_status: ["reserved", "paid", "expired", "cancelled", "refunded"],
       cell_status: ["available", "reserved", "sold"],
       order_status: [
