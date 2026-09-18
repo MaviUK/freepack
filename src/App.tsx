@@ -15,6 +15,7 @@ import {
   Truck,
   UserRound,
   WalletCards,
+  ShieldCheck,
   X,
 } from 'lucide-react'
 import { supabase } from './supabase'
@@ -31,6 +32,53 @@ type PanelConfig = {
   cols: number
   rows: number
   widthMm: number
+}
+
+type AdminBooking = {
+  id: string
+  status: string
+  artwork_review_status: string
+  artwork_review_notes: string | null
+  artwork_path: string | null
+  panel: PanelKey
+  square_count: number
+  total_pence: number
+  created_at: string
+  profiles: { display_name: string | null } | { display_name: string | null }[] | null
+  production_runs: {
+    run_code: string
+    bag_sizes: { name: string } | { name: string }[] | null
+  } | {
+    run_code: string
+    bag_sizes: { name: string } | { name: string }[] | null
+  }[] | null
+}
+
+type AdminOrder = {
+  id: string
+  status: string
+  created_at: string
+  takeaway_businesses: {
+    business_name: string
+    postcode: string | null
+  } | {
+    business_name: string
+    postcode: string | null
+  }[] | null
+  takeaway_order_items: Array<{
+    boxes: number
+    bags_per_box: number
+  }>
+}
+
+type AdminRun = {
+  id: string
+  run_code: string
+  status: string
+  estimated_start_date: string | null
+  price_per_square_pence: number
+  bag_quantity: number | null
+  bag_sizes: { name: string } | { name: string }[] | null
 }
 
 type AccountBooking = {
@@ -224,6 +272,14 @@ export default function App() {
   const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
   const [accountError, setAccountError] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [adminMessage, setAdminMessage] = useState('')
+  const [adminBookings, setAdminBookings] = useState<AdminBooking[]>([])
+  const [adminOrders, setAdminOrders] = useState<AdminOrder[]>([])
+  const [adminRuns, setAdminRuns] = useState<AdminRun[]>([])
+  const [adminArtworkUrls, setAdminArtworkUrls] = useState<Record<string, string>>({})
   const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
   const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
   const [takeawayMessage, setTakeawayMessage] = useState('')
@@ -272,13 +328,29 @@ export default function App() {
       setPaymentBanner('Payment was cancelled. Your reserved space remains held until the reservation expires.')
     }
 
-    supabase.auth.getClaims().then(({ data }) => {
-      setUserId(data.claims?.sub ?? null)
-    })
+    async function syncAuthState() {
+      const { data } = await supabase.auth.getClaims()
+      const id = data.claims?.sub ?? null
+      setUserId(id)
+
+      if (!id) {
+        setIsAdmin(false)
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('account_type')
+        .eq('id', id)
+        .maybeSingle()
+
+      setIsAdmin(profile?.account_type === 'admin')
+    }
+
+    syncAuthState()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async () => {
-      const { data } = await supabase.auth.getClaims()
-      setUserId(data.claims?.sub ?? null)
+      await syncAuthState()
     })
 
     return () => subscription.unsubscribe()
@@ -437,6 +509,164 @@ export default function App() {
       cancelled = true
     }
   }, [accountOpen, userId])
+
+  useEffect(() => {
+    if (!adminOpen || !userId || !isAdmin) return
+
+    let cancelled = false
+
+    async function loadAdminData() {
+      setAdminLoading(true)
+      setAdminMessage('')
+
+      const [bookingsResult, ordersResult, runsResult] = await Promise.all([
+        supabase
+          .from('ad_bookings')
+          .select(`
+            id,
+            status,
+            artwork_review_status,
+            artwork_review_notes,
+            artwork_path,
+            panel,
+            square_count,
+            total_pence,
+            created_at,
+            profiles (display_name),
+            production_runs (
+              run_code,
+              bag_sizes (name)
+            )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('takeaway_orders')
+          .select(`
+            id,
+            status,
+            created_at,
+            takeaway_businesses (business_name, postcode),
+            takeaway_order_items (boxes, bags_per_box)
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('production_runs')
+          .select(`
+            id,
+            run_code,
+            status,
+            estimated_start_date,
+            price_per_square_pence,
+            bag_quantity,
+            bag_sizes (name)
+          `)
+          .order('run_code'),
+      ])
+
+      if (cancelled) return
+
+      if (bookingsResult.error || ordersResult.error || runsResult.error) {
+        setAdminMessage(
+          bookingsResult.error?.message ??
+          ordersResult.error?.message ??
+          runsResult.error?.message ??
+          'Could not load admin data.',
+        )
+        setAdminLoading(false)
+        return
+      }
+
+      const bookings = (bookingsResult.data ?? []) as AdminBooking[]
+      setAdminBookings(bookings)
+      setAdminOrders((ordersResult.data ?? []) as AdminOrder[])
+      setAdminRuns((runsResult.data ?? []) as AdminRun[])
+
+      const artworkEntries = await Promise.all(
+        bookings
+          .filter((booking) => booking.artwork_path)
+          .map(async (booking) => {
+            const { data } = await supabase.storage
+              .from('ad-artwork')
+              .createSignedUrl(booking.artwork_path!, 300)
+            return [booking.id, data?.signedUrl ?? ''] as const
+          }),
+      )
+
+      if (!cancelled) {
+        setAdminArtworkUrls(Object.fromEntries(artworkEntries.filter(([, url]) => url)))
+      }
+
+      setAdminLoading(false)
+    }
+
+    loadAdminData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [adminOpen, userId, isAdmin])
+
+  async function updateArtworkReview(
+    bookingId: string,
+    status: 'approved' | 'changes_requested' | 'rejected',
+  ) {
+    setAdminMessage('')
+    const notes = status === 'approved' ? null : window.prompt('Optional note for the advertiser:') || null
+
+    const { error } = await supabase
+      .from('ad_bookings')
+      .update({
+        artwork_review_status: status,
+        artwork_review_notes: notes,
+        artwork_reviewed_at: new Date().toISOString(),
+        artwork_reviewed_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminBookings((current) => current.map((booking) =>
+      booking.id === bookingId
+        ? { ...booking, artwork_review_status: status, artwork_review_notes: notes }
+        : booking,
+    ))
+  }
+
+  async function updateOrderStatus(orderId: string, status: 'approved' | 'dispatching' | 'dispatched' | 'completed' | 'cancelled') {
+    const { error } = await supabase
+      .from('takeaway_orders')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminOrders((current) => current.map((order) =>
+      order.id === orderId ? { ...order, status } : order,
+    ))
+  }
+
+  async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'printing' | 'in_stock' | 'distributing' | 'completed') {
+    const { error } = await supabase
+      .from('production_runs')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', runDbId)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminRuns((current) => current.map((item) =>
+      item.id === runDbId ? { ...item, status } : item,
+    ))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -811,9 +1041,16 @@ export default function App() {
           <a href="#advertise">Advertise</a>
         </nav>
         {userId ? (
-          <button className="button button-dark" onClick={() => setAccountOpen(true)}>
-            My account
-          </button>
+          <div className="nav-actions">
+            {isAdmin && (
+              <button className="button button-light admin-nav-button" onClick={() => setAdminOpen(true)}>
+                Admin
+              </button>
+            )}
+            <button className="button button-dark" onClick={() => setAccountOpen(true)}>
+              My account
+            </button>
+          </div>
         ) : (
           <button className="button button-dark" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>
             Sign in
@@ -1184,6 +1421,142 @@ export default function App() {
           </p>
         </div>
       </section>
+
+      {adminOpen && isAdmin && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAdminOpen(false)}>
+          <section
+            className="checkout-modal admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Freepack admin"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setAdminOpen(false)} aria-label="Close admin">
+              <X size={20} />
+            </button>
+
+            <div className="checkout-icon"><ShieldCheck size={22} /></div>
+            <p className="kicker">PLATFORM ADMIN</p>
+            <h2>Freepack control room</h2>
+            <p className="checkout-intro">Approve artwork, progress takeaway orders and move production runs through the workflow.</p>
+
+            {adminLoading && <div className="account-loading">Loading live platform data…</div>}
+            {adminMessage && <div className="auth-message">{adminMessage}</div>}
+
+            {!adminLoading && (
+              <div className="admin-sections">
+                <section className="admin-section">
+                  <div className="account-section-heading">
+                    <ImagePlus size={18} />
+                    <div>
+                      <strong>Artwork review</strong>
+                      <span>{adminBookings.filter((booking) => booking.artwork_review_status === 'pending').length} pending</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-list">
+                    {adminBookings.length === 0 && <p className="account-empty">No advertising bookings yet.</p>}
+                    {adminBookings.map((booking) => {
+                      const runRelation = Array.isArray(booking.production_runs) ? booking.production_runs[0] : booking.production_runs
+                      const bagRelation = runRelation && Array.isArray(runRelation.bag_sizes) ? runRelation.bag_sizes[0] : runRelation?.bag_sizes
+                      const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles
+
+                      return (
+                        <article className="admin-item" key={booking.id}>
+                          {adminArtworkUrls[booking.id] ? (
+                            <img src={adminArtworkUrls[booking.id]} alt="Advertiser artwork" />
+                          ) : (
+                            <div className="admin-art-placeholder">No preview</div>
+                          )}
+                          <div className="admin-item-copy">
+                            <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'} · {booking.panel}</strong>
+                            <span>{profile?.display_name ?? 'Advertiser'} · {booking.square_count} squares · £{(booking.total_pence / 100).toFixed(2)}</span>
+                            <span className={`status-pill status-${booking.artwork_review_status}`}>{booking.artwork_review_status.replaceAll('_', ' ')}</span>
+                            {booking.artwork_review_notes && <small>{booking.artwork_review_notes}</small>}
+                          </div>
+                          <div className="admin-actions">
+                            <button onClick={() => updateArtworkReview(booking.id, 'approved')}>Approve</button>
+                            <button onClick={() => updateArtworkReview(booking.id, 'changes_requested')}>Changes</button>
+                            <button onClick={() => updateArtworkReview(booking.id, 'rejected')}>Reject</button>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                <section className="admin-section">
+                  <div className="account-section-heading">
+                    <Truck size={18} />
+                    <div>
+                      <strong>Takeaway orders</strong>
+                      <span>{adminOrders.length} total</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-list compact">
+                    {adminOrders.length === 0 && <p className="account-empty">No takeaway orders yet.</p>}
+                    {adminOrders.map((order) => {
+                      const business = Array.isArray(order.takeaway_businesses) ? order.takeaway_businesses[0] : order.takeaway_businesses
+                      const boxes = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
+
+                      return (
+                        <article className="admin-item order-admin-item" key={order.id}>
+                          <div className="admin-item-copy">
+                            <strong>{business?.business_name ?? 'Takeaway'}</strong>
+                            <span>{business?.postcode ?? 'No postcode'} · {boxes} box{boxes === 1 ? '' : 'es'}</span>
+                          </div>
+                          <select value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value as any)}>
+                            <option value="submitted">Submitted</option>
+                            <option value="approved">Approved</option>
+                            <option value="dispatching">Dispatching</option>
+                            <option value="dispatched">Dispatched</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </article>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                <section className="admin-section">
+                  <div className="account-section-heading">
+                    <Box size={18} />
+                    <div>
+                      <strong>Production runs</strong>
+                      <span>{adminRuns.length} runs</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-list compact">
+                    {adminRuns.map((item) => {
+                      const bag = Array.isArray(item.bag_sizes) ? item.bag_sizes[0] : item.bag_sizes
+                      return (
+                        <article className="admin-item order-admin-item" key={item.id}>
+                          <div className="admin-item-copy">
+                            <strong>{bag?.name ?? 'Bag'} · {item.run_code}</strong>
+                            <span>£{(item.price_per_square_pence / 100).toFixed(2)} / square</span>
+                          </div>
+                          <select value={item.status} onChange={(event) => updateRunStatus(item.id, event.target.value as any)}>
+                            <option value="selling">Selling advertising</option>
+                            <option value="funded">Funded / closed</option>
+                            <option value="artwork_review">Artwork approval</option>
+                            <option value="printing">Printing</option>
+                            <option value="in_stock">In stock</option>
+                            <option value="distributing">Distribution</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                        </article>
+                      )
+                    })}
+                  </div>
+                </section>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {accountOpen && userId && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setAccountOpen(false)}>
