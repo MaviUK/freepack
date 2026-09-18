@@ -331,7 +331,31 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     const payment = params.get('payment')
     const sessionId = params.get('session_id')
+    const confirmToken = params.get('confirm_token')
+    const confirmType = params.get('confirm_type')
     setPaymentSessionId(sessionId)
+
+    async function confirmEmailFromProductionLink() {
+      if (!confirmToken) return
+
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: confirmToken,
+        type: (confirmType || 'email') as 'email',
+      })
+
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.searchParams.delete('confirm_token')
+      cleanUrl.searchParams.delete('confirm_type')
+      window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash)
+
+      if (error) {
+        setPaymentBanner('That confirmation link is invalid or has expired. Please create the account again.')
+      } else {
+        setPaymentBanner('Email confirmed. Your FreePack account is ready.')
+      }
+    }
+
+    void confirmEmailFromProductionLink()
 
     if (payment === 'success') {
       setPaymentBanner('Payment received. Confirming your advertising space…')
