@@ -499,6 +499,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      submit_takeaway_order: {
+        Args: {
+          p_address_line_1: string
+          p_address_line_2: string
+          p_business_name: string
+          p_delivery_notes: string
+          p_items: Json
+          p_phone: string
+          p_postcode: string
+          p_town_city: string
+        }
+        Returns: {
+          created_at: string
+          delivery_notes: string | null
+          id: string
+          status: Database["public"]["Enums"]["order_status"]
+          submitted_at: string | null
+          takeaway_business_id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "takeaway_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       account_type: "takeaway" | "advertiser" | "admin"
