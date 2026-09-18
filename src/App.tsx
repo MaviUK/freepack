@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   Box,
+  CalendarDays,
   Check,
   ImagePlus,
   Megaphone,
@@ -9,21 +10,74 @@ import {
   RotateCcw,
 } from 'lucide-react'
 
-const COLS = 6
-const ROWS = 8
 const DEMO_SQUARE_PRICE = 192
-
-const soldCells = new Set([
-  '0-4', '0-5',
-  '1-4', '1-5',
-  '3-0', '3-1',
-  '4-0', '4-1',
-  '6-4', '6-5',
-  '7-4', '7-5',
-])
 
 type Point = { row: number; col: number }
 type Rect = { top: number; left: number; bottom: number; right: number }
+
+type BagRun = {
+  id: string
+  size: 'Small' | 'Medium' | 'Large' | 'XL'
+  dimensions: string
+  faceWidth: number
+  height: number
+  cols: number
+  rows: number
+  totalBagSquares: number
+  estimatedStart: string
+  sold: string[]
+}
+
+const BAG_RUNS: BagRun[] = [
+  {
+    id: 'S-001',
+    size: 'Small',
+    dimensions: '150 × 215 × 300 mm',
+    faceWidth: 150,
+    height: 300,
+    cols: 4,
+    rows: 8,
+    totalBagSquares: 80,
+    estimatedStart: 'December 2026',
+    sold: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
+  },
+  {
+    id: 'M-001',
+    size: 'Medium',
+    dimensions: '175 × 288 × 350 mm',
+    faceWidth: 175,
+    height: 350,
+    cols: 4,
+    rows: 10,
+    totalBagSquares: 120,
+    estimatedStart: 'December 2026',
+    sold: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
+  },
+  {
+    id: 'L-001',
+    size: 'Large',
+    dimensions: '200 × 315 × 375 mm',
+    faceWidth: 200,
+    height: 375,
+    cols: 5,
+    rows: 10,
+    totalBagSquares: 140,
+    estimatedStart: 'December 2026',
+    sold: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
+  },
+  {
+    id: 'XL-001',
+    size: 'XL',
+    dimensions: '250 × 388 × 413 mm',
+    faceWidth: 250,
+    height: 413,
+    cols: 7,
+    rows: 12,
+    totalBagSquares: 240,
+    estimatedStart: 'December 2026',
+    sold: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
+  },
+]
 
 function makeRect(a: Point, b: Point): Rect {
   return {
@@ -50,20 +104,36 @@ function shapeLabel(rect: Rect | null) {
 }
 
 export default function App() {
+  const [runId, setRunId] = useState('L-001')
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [preview, setPreview] = useState<Rect | null>(null)
   const [selection, setSelection] = useState<Rect | null>(null)
   const [artwork, setArtwork] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
+  const run = BAG_RUNS.find((item) => item.id === runId) ?? BAG_RUNS[2]
+  const soldCells = useMemo(() => new Set(run.sold), [run])
+  const frontSquares = run.cols * run.rows
+  const frontSold = run.sold.length
+  const frontAvailable = frontSquares - frontSold
+  const frontAvailability = Math.round((frontAvailable / frontSquares) * 100)
+
   const previewBlocked = useMemo(
     () => Boolean(preview && rectCells(preview).some((key) => soldCells.has(key))),
-    [preview],
+    [preview, soldCells],
   )
 
   const selectedCount = selection
     ? (selection.right - selection.left + 1) * (selection.bottom - selection.top + 1)
     : 0
+
+  function changeRun(id: string) {
+    setRunId(id)
+    setDragStart(null)
+    setPreview(null)
+    setSelection(null)
+    setArtwork(null)
+  }
 
   function startSelection(point: Point) {
     const key = `${point.row}-${point.col}`
@@ -78,10 +148,15 @@ export default function App() {
     setPreview(makeRect(dragStart, point))
   }
 
-  function finishSelection() {
-    if (!dragStart || !preview) return
-    if (!previewBlocked) {
-      setSelection(preview)
+  function finishSelection(point?: Point) {
+    if (!dragStart) return
+    const finalPreview = point ? makeRect(dragStart, point) : preview
+    if (!finalPreview) return
+
+    const blocked = rectCells(finalPreview).some((key) => soldCells.has(key))
+    if (!blocked) {
+      setSelection(finalPreview)
+      setPreview(finalPreview)
       setArtwork(null)
     }
     setDragStart(null)
@@ -144,6 +219,49 @@ export default function App() {
         </article>
       </section>
 
+      <section className="runs shell" id="bags">
+        <div className="runs-heading">
+          <div>
+            <p className="kicker">OPEN ADVERTISING RUNS</p>
+            <h2>Choose a bag size.</h2>
+          </div>
+          <p>Every size has its own advertising layout, while the price per 3 cm square stays the same.</p>
+        </div>
+
+        <div className="run-options">
+          {BAG_RUNS.map((item) => {
+            const sold = item.sold.length
+            const faceTotal = item.cols * item.rows
+            const availability = Math.round(((faceTotal - sold) / faceTotal) * 100)
+
+            return (
+              <button
+                key={item.id}
+                className={`run-option ${runId === item.id ? 'active' : ''}`}
+                onClick={() => {
+                  changeRun(item.id)
+                  document.getElementById('advertise')?.scrollIntoView({ behavior: 'smooth' })
+                }}
+              >
+                <div className="run-option-top">
+                  <span>{item.size}</span>
+                  {runId === item.id && <Check size={17} />}
+                </div>
+                <strong>{item.dimensions}</strong>
+                <div className="run-option-meta">
+                  <span>{item.totalBagSquares} total bag squares</span>
+                  <span>{availability}% front available</span>
+                </div>
+                <div className="availability-track">
+                  <i style={{ width: `${availability}%` }} />
+                </div>
+                <small><CalendarDays size={13} /> Est. start {item.estimatedStart}</small>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
       <section className="campaign shell" id="advertise">
         <div className="campaign-copy">
           <p className="kicker">INTERACTIVE AD SELECTOR</p>
@@ -153,12 +271,31 @@ export default function App() {
             1×3, 2×2, 2×3 or any other rectangular block that fits around sold space.
           </p>
 
+          <div className="run-switcher" aria-label="Choose bag run">
+            {BAG_RUNS.map((item) => (
+              <button
+                key={item.id}
+                className={runId === item.id ? 'active' : ''}
+                onClick={() => changeRun(item.id)}
+              >
+                {item.size}
+              </button>
+            ))}
+          </div>
+
           <div className="run-card">
             <div>
-              <span className="run-label">CURRENT DEMO RUN</span>
-              <strong>Large bag · Run 001</strong>
+              <span className="run-label">CURRENT RUN</span>
+              <strong>{run.size} bag · Run {run.id}</strong>
+              <small>{run.dimensions}</small>
             </div>
             <span className="run-status"><i /> Selling</span>
+          </div>
+
+          <div className="run-facts">
+            <span><strong>{frontAvailability}%</strong> front available</span>
+            <span><strong>{run.totalBagSquares}</strong> squares across full bag</span>
+            <span><strong>{run.estimatedStart}</strong> estimated start</span>
           </div>
 
           <div className="quote-card">
@@ -178,7 +315,7 @@ export default function App() {
               <span>Demo total</span>
               <strong>£{(selectedCount * DEMO_SQUARE_PRICE).toLocaleString()}</strong>
             </div>
-            <small>Pricing is a prototype value and can be changed per production run later.</small>
+            <small>Pricing is still a prototype value. The same square price will apply across every bag size.</small>
           </div>
 
           <div className="selector-actions">
@@ -204,20 +341,27 @@ export default function App() {
         </div>
 
         <div className="bag-wrap">
-          <div className="bag">
-            <div className="bag-handle" />
-            <div className="bag-label"><Box size={16} /> LARGE · RUN 001 · FRONT</div>
+          <div
+            className="bag"
+            style={{
+              aspectRatio: `${run.faceWidth} / ${run.height}`,
+              width: `min(${Math.max(320, Math.min(460, run.faceWidth * 1.75))}px, 100%)`,
+            }}
+          >
+            <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · FRONT</div>
 
             <div
               className="grid"
               aria-label="Advertising grid selector"
-              onPointerUp={finishSelection}
               onPointerLeave={() => dragStart && setDragStart(null)}
-              style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}
+              style={{
+                gridTemplateColumns: `repeat(${run.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${run.rows}, 1fr)`,
+              }}
             >
-              {Array.from({ length: ROWS * COLS }, (_, index) => {
-                const row = Math.floor(index / COLS)
-                const col = index % COLS
+              {Array.from({ length: run.rows * run.cols }, (_, index) => {
+                const row = Math.floor(index / run.cols)
+                const col = index % run.cols
                 const key = `${row}-${col}`
                 const sold = soldCells.has(key)
                 const inPreview = Boolean(
@@ -244,11 +388,10 @@ export default function App() {
                     onPointerEnter={() => extendSelection({ row, col })}
                     onPointerUp={(event) => {
                       event.preventDefault()
-                      extendSelection({ row, col })
-                      finishSelection()
+                      finishSelection({ row, col })
                     }}
                   >
-                    {sold ? <><Check size={13} /> SOLD</> : '+'}
+                    {sold ? <><Check size={12} /> SOLD</> : '+'}
                   </button>
                 )
               })}
@@ -278,10 +421,11 @@ export default function App() {
               <span><i className="key-selected" /> Your space</span>
             </div>
           </div>
+
           {previewBlocked && dragStart && (
             <div className="selection-warning">That rectangle includes space already sold.</div>
           )}
-          <p className="bag-help">Drag across available squares to build your advert.</p>
+          <p className="bag-help">Front shown for now. Front, back and both side panels will be selectable in the full builder.</p>
         </div>
       </section>
 
