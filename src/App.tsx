@@ -7,9 +7,12 @@ import {
   Check,
   ImagePlus,
   Megaphone,
+  Minus,
   PackageCheck,
+  Plus,
   RotateCcw,
   ShoppingBag,
+  Truck,
   X,
 } from 'lucide-react'
 
@@ -158,6 +161,12 @@ export default function App() {
   const [selection, setSelection] = useState<Rect | null>(null)
   const [artwork, setArtwork] = useState<string | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [bagBoxes, setBagBoxes] = useState<Record<string, number>>({
+    'S-001': 0,
+    'M-001': 0,
+    'L-001': 0,
+    'XL-001': 0,
+  })
   const fileInput = useRef<HTMLInputElement>(null)
 
   const run = BAG_RUNS.find((item) => item.id === runId) ?? BAG_RUNS[2]
@@ -182,6 +191,16 @@ export default function App() {
   const selectedCount = selection
     ? (selection.right - selection.left + 1) * (selection.bottom - selection.top + 1)
     : 0
+
+  const totalBoxes = Object.values(bagBoxes).reduce((sum, quantity) => sum + quantity, 0)
+  const totalBags = totalBoxes * 250
+
+  function changeBoxQuantity(id: string, delta: number) {
+    setBagBoxes((current) => ({
+      ...current,
+      [id]: Math.max(0, (current[id] ?? 0) + delta),
+    }))
+  }
 
   function clearSelection() {
     setDragStart(null)
@@ -262,7 +281,7 @@ export default function App() {
           run by buying advertising space directly on the bags.
         </p>
         <div className="hero-actions">
-          <button className="button button-dark">Get free bags <ArrowRight size={18} /></button>
+          <a className="button button-dark" href="#takeaway-order">Get free bags <ArrowRight size={18} /></a>
           <a className="button button-light" href="#advertise">Buy ad space</a>
         </div>
       </section>
@@ -324,6 +343,68 @@ export default function App() {
               </button>
             )
           })}
+        </div>
+      </section>
+
+      <section className="takeaway-order shell" id="takeaway-order">
+        <div className="takeaway-order-head">
+          <div>
+            <p className="kicker">FREE BAGS FOR TAKEAWAYS</p>
+            <h2>Build your box order.</h2>
+          </div>
+          <div className="free-badge">£0 for the bags</div>
+        </div>
+
+        <div className="takeaway-layout">
+          <div className="takeaway-products">
+            {BAG_RUNS.map((item) => (
+              <article className="takeaway-product" key={item.id}>
+                <div className="mini-bag" style={{ aspectRatio: `${item.faceWidth} / ${item.height}` }}>
+                  <span>{item.size}</span>
+                </div>
+                <div className="takeaway-product-copy">
+                  <span className="takeaway-size">{item.size}</span>
+                  <strong>{item.dimensions}</strong>
+                  <small>250 bags per box · current shared design</small>
+                </div>
+                <div className="quantity-control" aria-label={`${item.size} box quantity`}>
+                  <button onClick={() => changeBoxQuantity(item.id, -1)} disabled={!bagBoxes[item.id]}>
+                    <Minus size={15} />
+                  </button>
+                  <strong>{bagBoxes[item.id]}</strong>
+                  <button onClick={() => changeBoxQuantity(item.id, 1)}>
+                    <Plus size={15} />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <aside className="takeaway-summary">
+            <div className="summary-icon"><Truck size={21} /></div>
+            <p className="kicker">YOUR ORDER</p>
+            <div className="summary-number">{totalBoxes}</div>
+            <span className="summary-label">box{totalBoxes === 1 ? '' : 'es'} · {totalBags.toLocaleString()} bags</span>
+
+            <div className="summary-lines">
+              {BAG_RUNS.filter((item) => bagBoxes[item.id] > 0).map((item) => (
+                <div key={item.id}>
+                  <span>{item.size}</span>
+                  <strong>{bagBoxes[item.id]} × 250</strong>
+                </div>
+              ))}
+              {totalBoxes === 0 && <p>Choose the bag sizes and number of boxes you need.</p>}
+            </div>
+
+            <div className="summary-total">
+              <span>Bag cost</span>
+              <strong>£0.00</strong>
+            </div>
+            <button className="button button-dark takeaway-continue" disabled={totalBoxes === 0}>
+              Continue with order <ArrowRight size={17} />
+            </button>
+            <small className="summary-note">Business verification, availability and delivery details will be added when accounts are connected.</small>
+          </aside>
         </div>
       </section>
 
