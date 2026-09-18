@@ -224,7 +224,9 @@ function rectCells(rect: Rect) {
 
 function shapeLabel(rect: Rect | null) {
   if (!rect) return 'None selected'
-  return `${rect.right - rect.left + 1} × ${rect.bottom - rect.top + 1}`
+  const rows = rect.bottom - rect.top + 1
+  const cols = rect.right - rect.left + 1
+  return `${rows} × ${cols}`
 }
 
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -1272,8 +1274,8 @@ export default function App() {
           <p className="kicker">INTERACTIVE AD SELECTOR</p>
           <h2>Choose the exact<br />space you want.</h2>
           <p className="muted">
-            Build your advert directly on the bag. Tap one square to start at 1 × 1,
-            then keep tapping free squares beside the selected edge to add one row or column at a time.
+            Build your advert directly on the bag. Start with 1 × 1, tap left or right to add a column,
+            then tap above or below to add a row. For example: 1 × 1 → 1 × 2 → 2 × 2 → 3 × 2.
           </p>
 
           {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
