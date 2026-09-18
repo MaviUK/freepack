@@ -790,6 +790,15 @@ export default function App() {
     ? (selection.right - selection.left + 1) * (selection.bottom - selection.top + 1)
     : 0
 
+  const selectionStyle = selection
+    ? {
+        left: `calc(${(selection.left / panel.cols) * 100}% + ${(selection.left * 3) / panel.cols}px)`,
+        top: `calc(${(selection.top / panel.rows) * 100}% + ${(selection.top * 3) / panel.rows}px)`,
+        width: `calc(${((selection.right - selection.left + 1) / panel.cols) * 100}% - ${((panel.cols - (selection.right - selection.left + 1)) * 3) / panel.cols}px)`,
+        height: `calc(${((selection.bottom - selection.top + 1) / panel.rows) * 100}% - ${((panel.rows - (selection.bottom - selection.top + 1)) * 3) / panel.rows}px)`,
+      }
+    : undefined
+
   const totalBoxes = Object.values(bagBoxes).reduce((sum, quantity) => sum + quantity, 0)
   const totalBags = totalBoxes * 250
 
@@ -1415,75 +1424,79 @@ export default function App() {
           </div>
 
           <div
-            className={`bag bag-${panelKey}`}
+            className={`bag-scene bag-scene-${panelKey}`}
             style={{
-              aspectRatio: `${panel.widthMm} / ${run.height}`,
-              width: `min(${panel.widthMm * BAG_DISPLAY_SCALE}px, calc(100vw - 48px))`,
-            }}
+              '--bag-face-width': `${panel.widthMm * BAG_DISPLAY_SCALE}px`,
+              '--bag-face-ratio': `${panel.widthMm} / ${run.height}`,
+              '--bag-depth': `${Math.max(28, Math.min(82, run.sideWidth * BAG_DISPLAY_SCALE * 0.52))}px`,
+            } as React.CSSProperties}
           >
-            <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · {panel.label.toUpperCase()}</div>
+            <div className="bag-3d">
+              <div className="bag-side-plane" aria-hidden="true">
+                <div className="bag-side-gusset-line" />
+              </div>
+              <div className="bag-bottom-plane" aria-hidden="true" />
 
-            <div
-              className="grid"
-              aria-label={`${panel.label} advertising grid selector`}
-              onPointerUp={handleGridTap}
-              style={{
-                gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
-                gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
-              }}
-            >
-              {Array.from({ length: panel.rows * panel.cols }, (_, index) => {
-                const row = Math.floor(index / panel.cols)
-                const col = index % panel.cols
-                const key = `${row}-${col}`
-                const sold = soldCells.has(key)
-                const inPreview = Boolean(
-                  preview &&
-                  row >= preview.top &&
-                  row <= preview.bottom &&
-                  col >= preview.left &&
-                  col <= preview.right,
-                )
+              <div className={`bag-face bag-face-${panelKey}`}>
+                <div className="bag-top-fold" aria-hidden="true" />
+                <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · {panel.label.toUpperCase()}</div>
 
-                return (
-                  <button
-                    key={key}
-                    className={[
-                      'grid-cell',
-                      sold ? 'sold' : 'available',
-                      inPreview ? (previewBlocked ? 'blocked-preview' : 'selection-preview') : '',
-                    ].join(' ')}
-                    aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
-                    tabIndex={-1}
+                <div className="bag-print-area">
+                  <div
+                    className="grid"
+                    aria-label={`${panel.label} advertising grid selector`}
+                    onPointerUp={handleGridTap}
+                    style={{
+                      gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
+                      gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
+                    }}
                   >
-                    {sold ? <><Check size={11} /> SOLD</> : '+'}
-                  </button>
-                )
-              })}
+                    {Array.from({ length: panel.rows * panel.cols }, (_, index) => {
+                      const row = Math.floor(index / panel.cols)
+                      const col = index % panel.cols
+                      const key = `${row}-${col}`
+                      const sold = soldCells.has(key)
 
-              {selection && (
-                <div
-                  className={`artwork-overlay ${artwork ? 'has-artwork' : ''}`}
-                  style={{
-                    gridColumn: `${selection.left + 1} / ${selection.right + 2}`,
-                    gridRow: `${selection.top + 1} / ${selection.bottom + 2}`,
-                    backgroundImage: artwork ? `url("${artwork}")` : undefined,
-                  }}
-                >
-                  {!artwork && (
-                    <span>
-                      {shapeLabel(selection)}
-                      <small>{selectedCount} square{selectedCount === 1 ? '' : 's'}</small>
-                    </span>
+                      return (
+                        <button
+                          key={key}
+                          className={[
+                            'grid-cell',
+                            sold ? 'sold' : 'available',
+                          ].join(' ')}
+                          aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
+                          tabIndex={-1}
+                        >
+                          {sold ? <><Check size={11} /> SOLD</> : '+'}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {selection && selectionStyle && (
+                    <div
+                      className={`artwork-overlay artwork-overlay-absolute ${artwork ? 'has-artwork' : ''}`}
+                      style={{
+                        ...selectionStyle,
+                        backgroundImage: artwork ? `url("${artwork}")` : undefined,
+                      }}
+                    >
+                      {!artwork && (
+                        <span>
+                          {shapeLabel(selection)}
+                          <small>{selectedCount} square{selectedCount === 1 ? '' : 's'}</small>
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            <div className="bag-key">
-              <span><i className="key-available" /> Available</span>
-              <span><i className="key-sold" /> Sold</span>
-              <span><i className="key-selected" /> Your space</span>
+                <div className="bag-key">
+                  <span><i className="key-available" /> Available</span>
+                  <span><i className="key-sold" /> Sold</span>
+                  <span><i className="key-selected" /> Your space</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1511,7 +1524,7 @@ export default function App() {
           <p className="bag-help">
             {selection
               ? `Selected: ${shapeLabel(selection)}. Tap a free square directly beside any outside edge to add one row or column.`
-              : 'Tap any available square to start with 1 × 1.'}
+              : 'Tap any available square on the 3D bag to start with 1 × 1.'}
           </p>
         </div>
       </section>
