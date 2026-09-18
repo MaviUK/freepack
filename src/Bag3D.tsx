@@ -68,6 +68,8 @@ export default function Bag3D({
   const bagGroupRef = useRef<THREE.Group | null>(null)
   const overlaysRef = useRef<Record<BagPanelKey, OverlayFace> | null>(null)
   const animationRef = useRef<number | null>(null)
+  const onCellSelectRef = useRef(onCellSelect)
+  const onPanelChangeRef = useRef(onPanelChange)
   const dragStateRef = useRef({
     active: false,
     moved: false,
@@ -77,6 +79,11 @@ export default function Bag3D({
     lastX: 0,
     lastY: 0,
   })
+
+  useEffect(() => {
+    onCellSelectRef.current = onCellSelect
+    onPanelChangeRef.current = onPanelChange
+  }, [onCellSelect, onPanelChange])
 
   const soldSignature = useMemo(
     () => PANEL_ORDER.map((key) => `${key}:${soldByPanel[key].join(',')}`).join('|'),
@@ -345,8 +352,8 @@ export default function Bag3D({
       if (!drag.moved) {
         const hit = panelPointFromEvent(event)
         if (hit) {
-          onPanelChange(hit.panel)
-          onCellSelect(hit.panel, hit.point)
+          onPanelChangeRef.current(hit.panel)
+          onCellSelectRef.current(hit.panel, hit.point)
         }
       }
 
@@ -408,7 +415,7 @@ export default function Bag3D({
       bagGroupRef.current = null
       overlaysRef.current = null
     }
-  }, [widthMm, depthMm, heightMm, panels, onCellSelect, onPanelChange])
+  }, [widthMm, depthMm, heightMm, panels])
 
   useEffect(() => {
     const overlays = overlaysRef.current
