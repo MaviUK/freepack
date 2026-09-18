@@ -840,3 +840,33 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
 @media (max-width:520px) {
   .form-two { grid-template-columns:1fr; }
 }
+
+
+.stripe-pay-button {
+  background:#635bff;
+  color:#fff;
+  border:0;
+}
+.payment-banner {
+  position:sticky;
+  top:0;
+  z-index:40;
+  background:#dfe7d8;
+  color:#34412f;
+  border-bottom:1px solid rgba(23,23,19,.08);
+  padding:11px 18px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:18px;
+  font-size:13px;
+  font-weight:700;
+}
+.payment-banner button {
+  border:0;
+  background:transparent;
+  color:inherit;
+  display:grid;
+  place-items:center;
+  padding:3px;
+}
