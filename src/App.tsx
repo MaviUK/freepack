@@ -258,7 +258,6 @@ export default function App() {
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [preview, setPreview] = useState<Rect | null>(null)
   const [selection, setSelection] = useState<Rect | null>(null)
-  const [selectionAnchor, setSelectionAnchor] = useState<Point | null>(null)
   const [placementMessage, setPlacementMessage] = useState('')
   const [artwork, setArtwork] = useState<string | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
@@ -803,7 +802,6 @@ export default function App() {
     setDragStart(null)
     setPreview(null)
     setSelection(null)
-    setSelectionAnchor(null)
     setPlacementMessage('')
     setArtwork(null)
     setArtworkFile(null)
@@ -833,12 +831,11 @@ export default function App() {
     const key = `${point.row}-${point.col}`
     if (soldCells.has(key)) return
 
-    if (!selectionAnchor) {
+    if (!selection) {
       const rect = makeRect(point, point)
-      setSelectionAnchor(point)
       setPreview(rect)
       setSelection(rect)
-      setPlacementMessage('Tap another available square to make the advert larger, or upload artwork to keep 1 × 1.')
+      setPlacementMessage('1 × 1 selected. Tap a free square directly beside it to add a row or column.')
       setArtwork(null)
       setArtworkFile(null)
       setReservationMessage('')
@@ -847,18 +844,62 @@ export default function App() {
       return
     }
 
-    const rect = makeRect(selectionAnchor, point)
-    const blocked = rectCells(rect).some((cellKey) => soldCells.has(cellKey))
+    const isInside =
+      point.row >= selection.top &&
+      point.row <= selection.bottom &&
+      point.col >= selection.left &&
+      point.col <= selection.right
 
-    if (blocked) {
-      setPlacementMessage('That rectangle crosses space that is already taken. Choose a different end square.')
+    if (isInside) {
+      setPlacementMessage('That square is already inside your advert. Tap a free square directly beside an outside edge to make it bigger.')
       return
     }
 
-    setPreview(rect)
-    setSelection(rect)
-    setSelectionAnchor(null)
-    setPlacementMessage('')
+    let next: Rect | null = null
+
+    const besideLeft =
+      point.col === selection.left - 1 &&
+      point.row >= selection.top &&
+      point.row <= selection.bottom
+
+    const besideRight =
+      point.col === selection.right + 1 &&
+      point.row >= selection.top &&
+      point.row <= selection.bottom
+
+    const besideTop =
+      point.row === selection.top - 1 &&
+      point.col >= selection.left &&
+      point.col <= selection.right
+
+    const besideBottom =
+      point.row === selection.bottom + 1 &&
+      point.col >= selection.left &&
+      point.col <= selection.right
+
+    if (besideLeft) next = { ...selection, left: selection.left - 1 }
+    if (besideRight) next = { ...selection, right: selection.right + 1 }
+    if (besideTop) next = { ...selection, top: selection.top - 1 }
+    if (besideBottom) next = { ...selection, bottom: selection.bottom + 1 }
+
+    if (!next) {
+      setPlacementMessage('Tap a free square directly beside the selected rectangle to add one full row or column.')
+      return
+    }
+
+    const addedCells = rectCells(next).filter((cellKey) => !rectCells(selection).includes(cellKey))
+    const blocked = addedCells.some((cellKey) => soldCells.has(cellKey))
+
+    if (blocked) {
+      setPlacementMessage('That row or column includes space that is already taken.')
+      return
+    }
+
+    setPreview(next)
+    setSelection(next)
+    setPlacementMessage(
+      `${next.bottom - next.top + 1} × ${next.right - next.left + 1} selected. Keep tapping beside an edge to make it larger.`,
+    )
     setArtwork(null)
     setArtworkFile(null)
     setReservationMessage('')
@@ -1231,8 +1272,8 @@ export default function App() {
           <p className="kicker">INTERACTIVE AD SELECTOR</p>
           <h2>Choose the exact<br />space you want.</h2>
           <p className="muted">
-            Choose your space directly on the bag. Tap one available square for 1 × 1,
-            then tap another square to expand it into 1 × 2, 2 × 1, 2 × 2 and larger rectangles.
+            Build your advert directly on the bag. Tap one square to start at 1 × 1,
+            then keep tapping free squares beside the selected edge to add one row or column at a time.
           </p>
 
           {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
@@ -1437,11 +1478,9 @@ export default function App() {
             <div className="selection-warning">{placementMessage}</div>
           )}
           <p className="bag-help">
-            {selectionAnchor
-              ? 'Start selected. Tap another available square to set the opposite corner.'
-              : selection
-                ? `Selected: ${shapeLabel(selection)}. Tap a new square to start again, or upload artwork.`
-                : 'Tap an available square to start. Tap a second square to make a larger rectangle.'}
+            {selection
+              ? `Selected: ${shapeLabel(selection)}. Tap a free square directly beside any outside edge to add one row or column.`
+              : 'Tap any available square to start with 1 × 1.'}
           </p>
         </div>
       </section>
