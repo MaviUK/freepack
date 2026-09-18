@@ -178,6 +178,19 @@ export default function App() {
   const [reservationLoading, setReservationLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null)
+  const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
+  const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
+  const [takeawayMessage, setTakeawayMessage] = useState('')
+  const [takeawayOrderId, setTakeawayOrderId] = useState<string | null>(null)
+  const [takeawayDetails, setTakeawayDetails] = useState({
+    businessName: '',
+    phone: '',
+    address1: '',
+    address2: '',
+    townCity: '',
+    postcode: '',
+    deliveryNotes: '',
+  })
   const [bagBoxes, setBagBoxes] = useState<Record<string, number>>({
     'S-001': 0,
     'M-001': 0,
@@ -424,6 +437,66 @@ export default function App() {
     setAuthLoading(false)
   }
 
+  function openTakeawayCheckout() {
+    if (totalBoxes === 0) return
+    if (!userId) {
+      setAuthMode('signup')
+      setAuthOpen(true)
+      setAuthMessage('Create an account or sign in before placing a free bag order.')
+      return
+    }
+    setTakeawayMessage('')
+    setTakeawayCheckoutOpen(true)
+  }
+
+  async function submitTakeawayOrder(event: React.FormEvent) {
+    event.preventDefault()
+    if (!userId) {
+      setTakeawayCheckoutOpen(false)
+      setAuthMode('signin')
+      setAuthOpen(true)
+      setAuthMessage('Sign in to submit your bag order.')
+      return
+    }
+
+    const items = runs
+      .filter((item) => (bagBoxes[item.id] ?? 0) > 0 && item.dbId)
+      .map((item) => ({
+        production_run_id: item.dbId!,
+        boxes: bagBoxes[item.id],
+      }))
+
+    if (!items.length) {
+      setTakeawayMessage('Choose at least one box before submitting.')
+      return
+    }
+
+    setTakeawaySubmitting(true)
+    setTakeawayMessage('')
+
+    const { data: order, error } = await supabase.rpc('submit_takeaway_order', {
+      p_business_name: takeawayDetails.businessName,
+      p_phone: takeawayDetails.phone,
+      p_address_line_1: takeawayDetails.address1,
+      p_address_line_2: takeawayDetails.address2,
+      p_town_city: takeawayDetails.townCity,
+      p_postcode: takeawayDetails.postcode,
+      p_delivery_notes: takeawayDetails.deliveryNotes,
+      p_items: items,
+    })
+
+    if (error || !order) {
+      setTakeawayMessage(error?.message ?? 'Could not submit your order.')
+      setTakeawaySubmitting(false)
+      return
+    }
+
+    setTakeawayOrderId(order.id)
+    setTakeawayMessage('Order submitted. We’ll verify the business and confirm availability before dispatch.')
+    setTakeawaySubmitting(false)
+    setBagBoxes((current) => Object.fromEntries(Object.keys(current).map((key) => [key, 0])))
+  }
+
   async function reserveSelection() {
     if (!selection || !artworkFile || !run.dbId) return
 
@@ -635,7 +708,11 @@ export default function App() {
               <span>Bag cost</span>
               <strong>£0.00</strong>
             </div>
-            <button className="button button-dark takeaway-continue" disabled={totalBoxes === 0}>
+            <button
+              className="button button-dark takeaway-continue"
+              disabled={totalBoxes === 0}
+              onClick={openTakeawayCheckout}
+            >
               Continue with order <ArrowRight size={17} />
             </button>
             <small className="summary-note">Business verification, availability and delivery details will be added when accounts are connected.</small>
@@ -867,6 +944,123 @@ export default function App() {
           </p>
         </div>
       </section>
+
+      {takeawayCheckoutOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setTakeawayCheckoutOpen(false)}>
+          <section
+            className="checkout-modal takeaway-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Takeaway bag order"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setTakeawayCheckoutOpen(false)} aria-label="Close">
+              <X size={20} />
+            </button>
+
+            <div className="checkout-icon"><Truck size={22} /></div>
+            <p className="kicker">FREE BAG ORDER</p>
+            <h2>{takeawayOrderId ? 'Order received' : 'Delivery details'}</h2>
+
+            {takeawayOrderId ? (
+              <>
+                <div className="order-success">
+                  <Check size={22} />
+                  <div>
+                    <strong>Submitted successfully</strong>
+                    <span>Reference {takeawayOrderId.slice(0, 8).toUpperCase()}</span>
+                  </div>
+                </div>
+                <p className="checkout-intro">
+                  Your bags remain free. The order is awaiting business verification and stock confirmation.
+                </p>
+                <button
+                  className="button button-dark modal-primary"
+                  onClick={() => {
+                    setTakeawayCheckoutOpen(false)
+                    setTakeawayOrderId(null)
+                    setTakeawayMessage('')
+                  }}
+                >
+                  Done
+                </button>
+              </>
+            ) : (
+              <form className="takeaway-form" onSubmit={submitTakeawayOrder}>
+                <div className="takeaway-order-mini-summary">
+                  <strong>{totalBoxes} box{totalBoxes === 1 ? '' : 'es'}</strong>
+                  <span>{totalBags.toLocaleString()} bags · £0.00</span>
+                </div>
+
+                <div className="form-grid">
+                  <label className="full">
+                    Business name
+                    <input
+                      required
+                      value={takeawayDetails.businessName}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, businessName: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Phone
+                    <input
+                      value={takeawayDetails.phone}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, phone: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Postcode
+                    <input
+                      required
+                      value={takeawayDetails.postcode}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, postcode: event.target.value })}
+                    />
+                  </label>
+                  <label className="full">
+                    Address line 1
+                    <input
+                      required
+                      value={takeawayDetails.address1}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, address1: event.target.value })}
+                    />
+                  </label>
+                  <label className="full">
+                    Address line 2
+                    <input
+                      value={takeawayDetails.address2}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, address2: event.target.value })}
+                    />
+                  </label>
+                  <label className="full">
+                    Town / city
+                    <input
+                      value={takeawayDetails.townCity}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, townCity: event.target.value })}
+                    />
+                  </label>
+                  <label className="full">
+                    Delivery notes
+                    <textarea
+                      rows={3}
+                      value={takeawayDetails.deliveryNotes}
+                      onChange={(event) => setTakeawayDetails({ ...takeawayDetails, deliveryNotes: event.target.value })}
+                    />
+                  </label>
+                </div>
+
+                {takeawayMessage && <div className="auth-message">{takeawayMessage}</div>}
+
+                <button className="button button-dark modal-primary" disabled={takeawaySubmitting}>
+                  {takeawaySubmitting ? 'Submitting…' : 'Submit free bag order'}
+                </button>
+                <small className="summary-note">
+                  Orders are reviewed before dispatch so we can verify the takeaway and manage fair stock allocation.
+                </small>
+              </form>
+            )}
+          </section>
+        </div>
+      )}
 
       {authOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
