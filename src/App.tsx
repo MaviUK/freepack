@@ -330,7 +330,7 @@ export default function App() {
 
     async function syncAuthState() {
       const { data } = await supabase.auth.getClaims()
-      const id = data.claims?.sub ?? null
+      const id = data?.claims?.sub ?? null
       setUserId(id)
 
       if (!id) {
@@ -373,13 +373,14 @@ export default function App() {
 
           if (!row.production_run_id || !row.panel || row.row_index == null || row.col_index == null) return
 
+          const changedPanel = row.panel
           const cellKey = `${row.row_index}-${row.col_index}`
           const isAvailable = row.status === 'available'
 
           setRuns((current) => current.map((item) => {
             if (item.dbId !== row.production_run_id) return item
 
-            const nextPanel = new Set(item.soldByPanel[row.panel])
+            const nextPanel = new Set(item.soldByPanel[changedPanel])
             if (isAvailable) nextPanel.delete(cellKey)
             else nextPanel.add(cellKey)
 
@@ -387,7 +388,7 @@ export default function App() {
               ...item,
               soldByPanel: {
                 ...item.soldByPanel,
-                [row.panel]: Array.from(nextPanel),
+                [changedPanel]: Array.from(nextPanel),
               },
             }
           }))
