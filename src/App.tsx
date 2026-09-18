@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import {
+  ArrowLeft,
   ArrowRight,
   Box,
   CalendarDays,
@@ -14,19 +15,29 @@ const DEMO_SQUARE_PRICE = 192
 
 type Point = { row: number; col: number }
 type Rect = { top: number; left: number; bottom: number; right: number }
+type PanelKey = 'front' | 'right' | 'back' | 'left'
+
+type PanelConfig = {
+  label: string
+  shortLabel: string
+  cols: number
+  rows: number
+  widthMm: number
+}
 
 type BagRun = {
   id: string
   size: 'Small' | 'Medium' | 'Large' | 'XL'
   dimensions: string
   faceWidth: number
+  sideWidth: number
   height: number
-  cols: number
-  rows: number
   totalBagSquares: number
   estimatedStart: string
-  sold: string[]
+  soldByPanel: Record<PanelKey, string[]>
 }
+
+const PANEL_ORDER: PanelKey[] = ['front', 'right', 'back', 'left']
 
 const BAG_RUNS: BagRun[] = [
   {
@@ -34,48 +45,64 @@ const BAG_RUNS: BagRun[] = [
     size: 'Small',
     dimensions: '150 × 215 × 300 mm',
     faceWidth: 150,
+    sideWidth: 65,
     height: 300,
-    cols: 4,
-    rows: 8,
     totalBagSquares: 80,
     estimatedStart: 'December 2026',
-    sold: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
+    soldByPanel: {
+      front: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
+      right: ['1-0', '2-0'],
+      back: ['2-0', '2-1', '3-0', '3-1'],
+      left: ['5-0', '6-0'],
+    },
   },
   {
     id: 'M-001',
     size: 'Medium',
     dimensions: '175 × 288 × 350 mm',
     faceWidth: 175,
+    sideWidth: 113,
     height: 350,
-    cols: 4,
-    rows: 10,
     totalBagSquares: 120,
     estimatedStart: 'December 2026',
-    sold: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
+    soldByPanel: {
+      front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
+      right: ['1-0', '1-1', '2-0', '2-1'],
+      back: ['3-2', '3-3', '4-2', '4-3'],
+      left: ['6-0', '7-0'],
+    },
   },
   {
     id: 'L-001',
     size: 'Large',
     dimensions: '200 × 315 × 375 mm',
     faceWidth: 200,
+    sideWidth: 115,
     height: 375,
-    cols: 5,
-    rows: 10,
     totalBagSquares: 140,
     estimatedStart: 'December 2026',
-    sold: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
+    soldByPanel: {
+      front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
+      right: ['1-0', '1-1', '2-0', '2-1', '7-0'],
+      back: ['0-0', '0-1', '1-0', '1-1', '6-3', '6-4', '7-3', '7-4'],
+      left: ['4-0', '5-0', '6-0'],
+    },
   },
   {
     id: 'XL-001',
     size: 'XL',
     dimensions: '250 × 388 × 413 mm',
     faceWidth: 250,
+    sideWidth: 138,
     height: 413,
-    cols: 7,
-    rows: 12,
     totalBagSquares: 240,
     estimatedStart: 'December 2026',
-    sold: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
+    soldByPanel: {
+      front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
+      right: ['1-0', '1-1', '2-0', '2-1', '6-2', '7-2'],
+      back: ['2-3', '2-4', '2-5', '3-3', '3-4', '3-5', '8-0', '9-0'],
+      left: ['4-0', '4-1', '5-0', '5-1'],
+    },
   },
 ]
 
@@ -103,8 +130,27 @@ function shapeLabel(rect: Rect | null) {
   return `${rect.right - rect.left + 1} × ${rect.bottom - rect.top + 1}`
 }
 
+function gridCount(widthMm: number, heightMm: number) {
+  const cols = Math.floor((widthMm - 20 + 3) / 33)
+  const rows = Math.floor((heightMm - 20 + 3) / 33)
+  return { cols: Math.max(1, cols), rows: Math.max(1, rows) }
+}
+
+function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
+  const face = gridCount(run.faceWidth, run.height)
+  const side = gridCount(run.sideWidth, run.height)
+
+  return {
+    front: { label: 'Front', shortLabel: 'Front', cols: face.cols, rows: face.rows, widthMm: run.faceWidth },
+    right: { label: 'Right side', shortLabel: 'Right', cols: side.cols, rows: side.rows, widthMm: run.sideWidth },
+    back: { label: 'Back', shortLabel: 'Back', cols: face.cols, rows: face.rows, widthMm: run.faceWidth },
+    left: { label: 'Left side', shortLabel: 'Left', cols: side.cols, rows: side.rows, widthMm: run.sideWidth },
+  }
+}
+
 export default function App() {
   const [runId, setRunId] = useState('L-001')
+  const [panelKey, setPanelKey] = useState<PanelKey>('front')
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [preview, setPreview] = useState<Rect | null>(null)
   const [selection, setSelection] = useState<Rect | null>(null)
@@ -112,11 +158,18 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const run = BAG_RUNS.find((item) => item.id === runId) ?? BAG_RUNS[2]
-  const soldCells = useMemo(() => new Set(run.sold), [run])
-  const frontSquares = run.cols * run.rows
-  const frontSold = run.sold.length
-  const frontAvailable = frontSquares - frontSold
-  const frontAvailability = Math.round((frontAvailable / frontSquares) * 100)
+  const panels = useMemo(() => panelsForRun(run), [run])
+  const panel = panels[panelKey]
+  const soldCells = useMemo(() => new Set(run.soldByPanel[panelKey]), [run, panelKey])
+
+  const panelSquares = panel.cols * panel.rows
+  const panelSold = run.soldByPanel[panelKey].length
+  const panelAvailable = panelSquares - panelSold
+  const panelAvailability = Math.round((panelAvailable / panelSquares) * 100)
+
+  const totalSold = PANEL_ORDER.reduce((sum, key) => sum + run.soldByPanel[key].length, 0)
+  const totalAvailable = run.totalBagSquares - totalSold
+  const totalAvailability = Math.round((totalAvailable / run.totalBagSquares) * 100)
 
   const previewBlocked = useMemo(
     () => Boolean(preview && rectCells(preview).some((key) => soldCells.has(key))),
@@ -127,12 +180,28 @@ export default function App() {
     ? (selection.right - selection.left + 1) * (selection.bottom - selection.top + 1)
     : 0
 
-  function changeRun(id: string) {
-    setRunId(id)
+  function clearSelection() {
     setDragStart(null)
     setPreview(null)
     setSelection(null)
     setArtwork(null)
+  }
+
+  function changeRun(id: string) {
+    setRunId(id)
+    setPanelKey('front')
+    clearSelection()
+  }
+
+  function changePanel(key: PanelKey) {
+    setPanelKey(key)
+    clearSelection()
+  }
+
+  function rotatePanel(direction: 1 | -1) {
+    const index = PANEL_ORDER.indexOf(panelKey)
+    const nextIndex = (index + direction + PANEL_ORDER.length) % PANEL_ORDER.length
+    changePanel(PANEL_ORDER[nextIndex])
   }
 
   function startSelection(point: Point) {
@@ -160,13 +229,6 @@ export default function App() {
       setArtwork(null)
     }
     setDragStart(null)
-  }
-
-  function resetSelection() {
-    setDragStart(null)
-    setPreview(null)
-    setSelection(null)
-    setArtwork(null)
   }
 
   function uploadArtwork(file?: File) {
@@ -214,7 +276,7 @@ export default function App() {
           <div className="icon"><Megaphone /></div>
           <p className="kicker">FOR ADVERTISERS</p>
           <h2>Put your brand in<br />customers' hands.</h2>
-          <p>Choose a run, drag across available 3 cm × 3 cm units to create a rectangular ad, upload your artwork and preview it on the bag.</p>
+          <p>Choose a run, pick a face of the bag, drag across available 3 cm × 3 cm units and upload your artwork.</p>
           <a href="#advertise">Try the selector <ArrowRight size={16} /></a>
         </article>
       </section>
@@ -230,9 +292,8 @@ export default function App() {
 
         <div className="run-options">
           {BAG_RUNS.map((item) => {
-            const sold = item.sold.length
-            const faceTotal = item.cols * item.rows
-            const availability = Math.round(((faceTotal - sold) / faceTotal) * 100)
+            const sold = PANEL_ORDER.reduce((sum, key) => sum + item.soldByPanel[key].length, 0)
+            const availability = Math.round(((item.totalBagSquares - sold) / item.totalBagSquares) * 100)
 
             return (
               <button
@@ -250,7 +311,7 @@ export default function App() {
                 <strong>{item.dimensions}</strong>
                 <div className="run-option-meta">
                   <span>{item.totalBagSquares} total bag squares</span>
-                  <span>{availability}% front available</span>
+                  <span>{availability}% available across full bag</span>
                 </div>
                 <div className="availability-track">
                   <i style={{ width: `${availability}%` }} />
@@ -267,8 +328,8 @@ export default function App() {
           <p className="kicker">INTERACTIVE AD SELECTOR</p>
           <h2>Choose the exact<br />space you want.</h2>
           <p className="muted">
-            Drag from one available square to another. Your selection can be 1×1,
-            1×3, 2×2, 2×3 or any other rectangular block that fits around sold space.
+            Select a bag face, then drag from one available square to another. Your
+            advert can be any rectangular block that fits around space already sold.
           </p>
 
           <div className="run-switcher" aria-label="Choose bag run">
@@ -292,13 +353,35 @@ export default function App() {
             <span className="run-status"><i /> Selling</span>
           </div>
 
+          <div className="surface-tabs" aria-label="Choose bag face">
+            {PANEL_ORDER.map((key) => {
+              const face = panels[key]
+              const sold = run.soldByPanel[key].length
+              const available = face.cols * face.rows - sold
+              return (
+                <button
+                  key={key}
+                  className={panelKey === key ? 'active' : ''}
+                  onClick={() => changePanel(key)}
+                >
+                  <span>{face.shortLabel}</span>
+                  <small>{available} free</small>
+                </button>
+              )
+            })}
+          </div>
+
           <div className="run-facts">
-            <span><strong>{frontAvailability}%</strong> front available</span>
-            <span><strong>{run.totalBagSquares}</strong> squares across full bag</span>
+            <span><strong>{panelAvailability}%</strong> {panel.label.toLowerCase()} available</span>
+            <span><strong>{totalAvailability}%</strong> whole bag available</span>
             <span><strong>{run.estimatedStart}</strong> estimated start</span>
           </div>
 
           <div className="quote-card">
+            <div className="quote-row">
+              <span>Bag face</span>
+              <strong>{panel.label}</strong>
+            </div>
             <div className="quote-row">
               <span>Selected shape</span>
               <strong>{shapeLabel(selection)}</strong>
@@ -315,7 +398,7 @@ export default function App() {
               <span>Demo total</span>
               <strong>£{(selectedCount * DEMO_SQUARE_PRICE).toLocaleString()}</strong>
             </div>
-            <small>Pricing is still a prototype value. The same square price will apply across every bag size.</small>
+            <small>Pricing is still a prototype value. The same square price will apply across every bag size and face.</small>
           </div>
 
           <div className="selector-actions">
@@ -334,34 +417,40 @@ export default function App() {
               <ImagePlus size={18} />
               {artwork ? 'Change artwork' : 'Upload artwork'}
             </button>
-            <button className="reset-button" onClick={resetSelection} disabled={!selection && !preview}>
+            <button className="reset-button" onClick={clearSelection} disabled={!selection && !preview}>
               <RotateCcw size={16} /> Reset
             </button>
           </div>
         </div>
 
         <div className="bag-wrap">
+          <div className="surface-control">
+            <button onClick={() => rotatePanel(-1)} aria-label="Previous bag face"><ArrowLeft size={17} /></button>
+            <span>{panel.label}</span>
+            <button onClick={() => rotatePanel(1)} aria-label="Next bag face"><ArrowRight size={17} /></button>
+          </div>
+
           <div
-            className="bag"
+            className={`bag bag-${panelKey}`}
             style={{
-              aspectRatio: `${run.faceWidth} / ${run.height}`,
-              width: `min(${Math.max(320, Math.min(460, run.faceWidth * 1.75))}px, 100%)`,
+              aspectRatio: `${panel.widthMm} / ${run.height}`,
+              width: `min(${Math.max(235, Math.min(455, panel.widthMm * 1.8))}px, 100%)`,
             }}
           >
-            <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · FRONT</div>
+            <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · {panel.label.toUpperCase()}</div>
 
             <div
               className="grid"
-              aria-label="Advertising grid selector"
+              aria-label={`${panel.label} advertising grid selector`}
               onPointerLeave={() => dragStart && setDragStart(null)}
               style={{
-                gridTemplateColumns: `repeat(${run.cols}, 1fr)`,
-                gridTemplateRows: `repeat(${run.rows}, 1fr)`,
+                gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
               }}
             >
-              {Array.from({ length: run.rows * run.cols }, (_, index) => {
-                const row = Math.floor(index / run.cols)
-                const col = index % run.cols
+              {Array.from({ length: panel.rows * panel.cols }, (_, index) => {
+                const row = Math.floor(index / panel.cols)
+                const col = index % panel.cols
                 const key = `${row}-${col}`
                 const sold = soldCells.has(key)
                 const inPreview = Boolean(
@@ -391,7 +480,7 @@ export default function App() {
                       finishSelection({ row, col })
                     }}
                   >
-                    {sold ? <><Check size={12} /> SOLD</> : '+'}
+                    {sold ? <><Check size={11} /> SOLD</> : '+'}
                   </button>
                 )
               })}
@@ -422,10 +511,30 @@ export default function App() {
             </div>
           </div>
 
+          <div className="panel-map" aria-label="Bag face overview">
+            {PANEL_ORDER.map((key) => {
+              const face = panels[key]
+              const sold = run.soldByPanel[key].length
+              const total = face.cols * face.rows
+              return (
+                <button
+                  key={key}
+                  className={panelKey === key ? 'active' : ''}
+                  onClick={() => changePanel(key)}
+                >
+                  <span>{face.shortLabel}</span>
+                  <strong>{total - sold}/{total}</strong>
+                </button>
+              )
+            })}
+          </div>
+
           {previewBlocked && dragStart && (
             <div className="selection-warning">That rectangle includes space already sold.</div>
           )}
-          <p className="bag-help">Front shown for now. Front, back and both side panels will be selectable in the full builder.</p>
+          <p className="bag-help">
+            All four printable faces are now live. Switching face clears the current draft selection.
+          </p>
         </div>
       </section>
 
