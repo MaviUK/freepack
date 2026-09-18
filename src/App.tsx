@@ -258,6 +258,9 @@ export default function App() {
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [preview, setPreview] = useState<Rect | null>(null)
   const [selection, setSelection] = useState<Rect | null>(null)
+  const [shapeCols, setShapeCols] = useState(1)
+  const [shapeRows, setShapeRows] = useState(1)
+  const [placementMessage, setPlacementMessage] = useState('')
   const [artwork, setArtwork] = useState<string | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
@@ -801,6 +804,7 @@ export default function App() {
     setDragStart(null)
     setPreview(null)
     setSelection(null)
+    setPlacementMessage('')
     setArtwork(null)
     setArtworkFile(null)
     setReservationMessage('')
@@ -811,11 +815,16 @@ export default function App() {
   function changeRun(id: string) {
     setRunId(id)
     setPanelKey('front')
+    setShapeCols(1)
+    setShapeRows(1)
     clearSelection()
   }
 
   function changePanel(key: PanelKey) {
+    const nextPanel = panels[key]
     setPanelKey(key)
+    setShapeCols((current) => Math.min(current, nextPanel.cols))
+    setShapeRows((current) => Math.min(current, nextPanel.rows))
     clearSelection()
   }
 
@@ -825,82 +834,40 @@ export default function App() {
     changePanel(PANEL_ORDER[nextIndex])
   }
 
-  function pointFromPointerEvent(event: React.PointerEvent<HTMLElement>): Point | null {
-    const element = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null
-    const cell = element?.closest<HTMLElement>('[data-grid-cell="true"]')
-    if (!cell) return null
-
-    const row = Number(cell.dataset.row)
-    const col = Number(cell.dataset.col)
-    if (!Number.isInteger(row) || !Number.isInteger(col)) return null
-    return { row, col }
+  function chooseShape(cols: number, rows: number) {
+    setShapeCols(cols)
+    setShapeRows(rows)
+    clearSelection()
   }
 
-  function handleGridPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    const point = pointFromPointerEvent(event)
-    if (!point || soldCells.has(`${point.row}-${point.col}`)) return
+  function placeSelectedShape(point: Point) {
+    const rect: Rect = {
+      top: point.row,
+      left: point.col,
+      bottom: point.row + shapeRows - 1,
+      right: point.col + shapeCols - 1,
+    }
 
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-
-    const canExtendSingleCell =
-      selection &&
-      !artwork &&
-      selection.top === selection.bottom &&
-      selection.left === selection.right &&
-      (selection.top !== point.row || selection.left !== point.col)
-
-    if (canExtendSingleCell) {
-      const anchor = { row: selection.top, col: selection.left }
-      setDragStart(anchor)
-      setPreview(makeRect(anchor, point))
+    if (rect.right >= panel.cols || rect.bottom >= panel.rows) {
+      setPlacementMessage(`A ${shapeCols} × ${shapeRows} advert will not fit from that square. Choose a position further up or left.`)
       return
     }
 
-    startSelection(point)
-  }
-
-  function handleGridPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!dragStart) return
-    const point = pointFromPointerEvent(event)
-    if (point) extendSelection(point)
-  }
-
-  function handleGridPointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    if (!dragStart) return
-    event.preventDefault()
-    const point = pointFromPointerEvent(event) ?? dragStart
-    finishSelection(point)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
+    const blocked = rectCells(rect).some((key) => soldCells.has(key))
+    if (blocked) {
+      setPlacementMessage('That position overlaps advertising space that is already taken.')
+      return
     }
-  }
 
-  function startSelection(point: Point) {
-    const key = `${point.row}-${point.col}`
-    if (soldCells.has(key)) return
-    const rect = makeRect(point, point)
-    setDragStart(point)
-    setPreview(rect)
-  }
-
-  function extendSelection(point: Point) {
-    if (!dragStart) return
-    setPreview(makeRect(dragStart, point))
-  }
-
-  function finishSelection(point?: Point) {
-    if (!dragStart) return
-    const finalPreview = point ? makeRect(dragStart, point) : preview
-    if (!finalPreview) return
-
-    const blocked = rectCells(finalPreview).some((key) => soldCells.has(key))
-    if (!blocked) {
-      setSelection(finalPreview)
-      setPreview(finalPreview)
-      setArtwork(null)
-    }
+    setPlacementMessage('')
     setDragStart(null)
+    setPreview(rect)
+    setSelection(rect)
+    setArtwork(null)
+    setArtworkFile(null)
+    setReservationMessage('')
+    setActiveBookingId(null)
+    setCheckoutOpen(false)
   }
 
   function uploadArtwork(file?: File) {
@@ -1268,8 +1235,8 @@ export default function App() {
           <p className="kicker">INTERACTIVE AD SELECTOR</p>
           <h2>Choose the exact<br />space you want.</h2>
           <p className="muted">
-            Select a bag face, then drag from one available square to another. Your
-            advert can be any rectangular block that fits around space already sold.
+            Choose the advert size first — 1 × 1, 1 × 2, 2 × 1, 2 × 2 and so on —
+            then tap an available square to place that exact rectangle on the bag.
           </p>
 
           {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
@@ -1310,6 +1277,51 @@ export default function App() {
                 </button>
               )
             })}
+          </div>
+
+          <div className="ad-size-picker">
+            <div className="ad-size-picker-head">
+              <div>
+                <span className="run-label">AD SIZE</span>
+                <strong>{shapeCols} × {shapeRows}</strong>
+                <small>{shapeCols * 3} × {shapeRows * 3} cm</small>
+              </div>
+              <span>{shapeCols * shapeRows} square{shapeCols * shapeRows === 1 ? '' : 's'}</span>
+            </div>
+
+            <div className="size-axis">
+              <span>Width</span>
+              <div>
+                {Array.from({ length: panel.cols }, (_, index) => index + 1).map((value) => (
+                  <button
+                    key={`width-${value}`}
+                    className={shapeCols === value ? 'active' : ''}
+                    onClick={() => chooseShape(value, shapeRows)}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="size-axis">
+              <span>Height</span>
+              <div>
+                {Array.from({ length: panel.rows }, (_, index) => index + 1).map((value) => (
+                  <button
+                    key={`height-${value}`}
+                    className={shapeRows === value ? 'active' : ''}
+                    onClick={() => chooseShape(shapeCols, value)}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <small className="size-picker-help">
+              Example: width 2 + height 1 = a 2 × 1 advert. Now tap where its top-left corner should sit.
+            </small>
           </div>
 
           <div className="run-facts">
@@ -1392,13 +1404,6 @@ export default function App() {
             <div
               className="grid"
               aria-label={`${panel.label} advertising grid selector`}
-              onPointerDown={handleGridPointerDown}
-              onPointerMove={handleGridPointerMove}
-              onPointerUp={handleGridPointerUp}
-              onPointerCancel={() => {
-                setDragStart(null)
-                setPreview(selection)
-              }}
               style={{
                 gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
                 gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
@@ -1426,9 +1431,7 @@ export default function App() {
                       inPreview ? (previewBlocked ? 'blocked-preview' : 'selection-preview') : '',
                     ].join(' ')}
                     aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
-                    data-grid-cell="true"
-                    data-row={row}
-                    data-col={col}
+                    onClick={() => !sold && placeSelectedShape({ row, col })}
                   >
                     {sold ? <><Check size={11} /> SOLD</> : '+'}
                   </button>
@@ -1479,11 +1482,11 @@ export default function App() {
             })}
           </div>
 
-          {previewBlocked && dragStart && (
-            <div className="selection-warning">That rectangle includes space already sold.</div>
+          {placementMessage && (
+            <div className="selection-warning">{placementMessage}</div>
           )}
           <p className="bag-help">
-            All four printable faces are live. Drag across squares, or tap one square then another, to create a rectangular advert.
+            Selected size: {shapeCols} × {shapeRows}. Tap the square where the advert's top-left corner should start.
           </p>
         </div>
       </section>
