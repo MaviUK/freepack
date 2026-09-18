@@ -23,11 +23,14 @@ export type Database = {
           left_col: number
           paid_at: string | null
           panel: Database["public"]["Enums"]["panel_type"]
+          payment_currency: string
           price_per_square_pence: number
           production_run_id: string
           reserved_until: string | null
           square_count: number
           status: Database["public"]["Enums"]["booking_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
           top_row: number
           total_pence: number
           updated_at: string
@@ -42,11 +45,14 @@ export type Database = {
           left_col: number
           paid_at?: string | null
           panel: Database["public"]["Enums"]["panel_type"]
+          payment_currency?: string
           price_per_square_pence: number
           production_run_id: string
           reserved_until?: string | null
           square_count: number
           status?: Database["public"]["Enums"]["booking_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           top_row: number
           total_pence: number
           updated_at?: string
@@ -61,11 +67,14 @@ export type Database = {
           left_col?: number
           paid_at?: string | null
           panel?: Database["public"]["Enums"]["panel_type"]
+          payment_currency?: string
           price_per_square_pence?: number
           production_run_id?: string
           reserved_until?: string | null
           square_count?: number
           status?: Database["public"]["Enums"]["booking_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           top_row?: number
           total_pence?: number
           updated_at?: string
@@ -460,6 +469,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_ad_booking: {
+        Args: { p_booking_id: string; p_checkout_session_id: string }
+        Returns: undefined
+      }
+      mark_ad_booking_paid: {
+        Args: {
+          p_booking_id: string
+          p_checkout_session_id: string
+          p_payment_intent_id: string
+        }
+        Returns: undefined
+      }
       release_ad_reservation: {
         Args: { p_booking_id: string }
         Returns: undefined
@@ -481,11 +502,14 @@ export type Database = {
           left_col: number
           paid_at: string | null
           panel: Database["public"]["Enums"]["panel_type"]
+          payment_currency: string
           price_per_square_pence: number
           production_run_id: string
           reserved_until: string | null
           square_count: number
           status: Database["public"]["Enums"]["booking_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
           top_row: number
           total_pence: number
           updated_at: string
