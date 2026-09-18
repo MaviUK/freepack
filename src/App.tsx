@@ -180,18 +180,6 @@ export default function App() {
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [paymentBanner, setPaymentBanner] = useState('')
-  const [takeawayOpen, setTakeawayOpen] = useState(false)
-  const [takeawayLoading, setTakeawayLoading] = useState(false)
-  const [takeawayMessage, setTakeawayMessage] = useState('')
-  const [takeawayBusiness, setTakeawayBusiness] = useState({
-    businessName: '',
-    phone: '',
-    address1: '',
-    address2: '',
-    townCity: '',
-    postcode: '',
-    notes: '',
-  })
   const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
   const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
   const [takeawayMessage, setTakeawayMessage] = useState('')
@@ -247,6 +235,50 @@ export default function App() {
     })
 
     return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('freepack-ad-cells')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ad_cells' },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as {
+            production_run_id?: string
+            panel?: PanelKey
+            row_index?: number
+            col_index?: number
+            status?: string
+          }
+
+          if (!row.production_run_id || !row.panel || row.row_index == null || row.col_index == null) return
+
+          const cellKey = `${row.row_index}-${row.col_index}`
+          const isAvailable = row.status === 'available'
+
+          setRuns((current) => current.map((item) => {
+            if (item.dbId !== row.production_run_id) return item
+
+            const nextPanel = new Set(item.soldByPanel[row.panel])
+            if (isAvailable) nextPanel.delete(cellKey)
+            else nextPanel.add(cellKey)
+
+            return {
+              ...item,
+              soldByPanel: {
+                ...item.soldByPanel,
+                [row.panel]: Array.from(nextPanel),
+              },
+            }
+          }))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
@@ -518,54 +550,6 @@ export default function App() {
     setTakeawayMessage('Order submitted. We’ll verify the business and confirm availability before dispatch.')
     setTakeawaySubmitting(false)
     setBagBoxes((current) => Object.fromEntries(Object.keys(current).map((key) => [key, 0])))
-  }
-
-  async function submitTakeawayOrder(event: React.FormEvent) {
-    event.preventDefault()
-
-    if (!userId) {
-      setTakeawayOpen(false)
-      setAuthMode('signup')
-      setAuthOpen(true)
-      setAuthMessage('Create an account or sign in before placing a free bag order.')
-      return
-    }
-
-    const items = runs
-      .filter((item) => (bagBoxes[item.id] ?? 0) > 0 && item.dbId)
-      .map((item) => ({
-        production_run_id: item.dbId!,
-        boxes: bagBoxes[item.id],
-      }))
-
-    if (!items.length) {
-      setTakeawayMessage('Choose at least one box.')
-      return
-    }
-
-    setTakeawayLoading(true)
-    setTakeawayMessage('')
-
-    const { data, error } = await supabase.rpc('submit_takeaway_order', {
-      p_business_name: takeawayBusiness.businessName,
-      p_phone: takeawayBusiness.phone,
-      p_address_line_1: takeawayBusiness.address1,
-      p_address_line_2: takeawayBusiness.address2,
-      p_town_city: takeawayBusiness.townCity,
-      p_postcode: takeawayBusiness.postcode,
-      p_delivery_notes: takeawayBusiness.notes,
-      p_items: items,
-    })
-
-    if (error) {
-      setTakeawayMessage(error.message)
-      setTakeawayLoading(false)
-      return
-    }
-
-    setTakeawayMessage(`Order submitted successfully. Reference ${data.id.slice(0, 8).toUpperCase()}.`)
-    setBagBoxes((current) => Object.fromEntries(Object.keys(current).map((key) => [key, 0])))
-    setTakeawayLoading(false)
   }
 
   async function startStripeCheckout() {
