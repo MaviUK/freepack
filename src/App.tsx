@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +15,7 @@ import {
   Truck,
   X,
 } from 'lucide-react'
+import { supabase } from './supabase'
 
 const DEMO_SQUARE_PRICE = 192
 
@@ -32,6 +33,7 @@ type PanelConfig = {
 
 type BagRun = {
   id: string
+  dbId?: string
   size: 'Small' | 'Medium' | 'Large' | 'XL'
   dimensions: string
   faceWidth: number
@@ -39,6 +41,7 @@ type BagRun = {
   height: number
   totalBagSquares: number
   estimatedStart: string
+  pricePerSquarePence?: number
   soldByPanel: Record<PanelKey, string[]>
 }
 
@@ -154,6 +157,8 @@ function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
 }
 
 export default function App() {
+  const [runs, setRuns] = useState<BagRun[]>(BAG_RUNS)
+  const [runsLoading, setRunsLoading] = useState(true)
   const [runId, setRunId] = useState('L-001')
   const [panelKey, setPanelKey] = useState<PanelKey>('front')
   const [dragStart, setDragStart] = useState<Point | null>(null)
@@ -169,7 +174,7 @@ export default function App() {
   })
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const run = BAG_RUNS.find((item) => item.id === runId) ?? BAG_RUNS[2]
+  const run = runs.find((item) => item.id === runId) ?? runs[0] ?? BAG_RUNS[2]
   const panels = useMemo(() => panelsForRun(run), [run])
   const panel = panels[panelKey]
   const soldCells = useMemo(() => new Set(run.soldByPanel[panelKey]), [run, panelKey])
@@ -182,6 +187,108 @@ export default function App() {
   const totalSold = PANEL_ORDER.reduce((sum, key) => sum + run.soldByPanel[key].length, 0)
   const totalAvailable = run.totalBagSquares - totalSold
   const totalAvailability = Math.round((totalAvailable / run.totalBagSquares) * 100)
+  const squarePricePence = run.pricePerSquarePence ?? DEMO_SQUARE_PRICE * 100
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadRuns() {
+      setRunsLoading(true)
+
+      const { data: runRows, error: runsError } = await supabase
+        .from('production_runs')
+        .select(`
+          id,
+          run_code,
+          status,
+          estimated_start_date,
+          price_per_square_pence,
+          bag_sizes (
+            code,
+            name,
+            front_width_mm,
+            side_gusset_mm,
+            height_mm,
+            front_cols,
+            front_rows,
+            side_cols,
+            side_rows,
+            total_square_count
+          )
+        `)
+        .in('status', ['selling', 'funded', 'artwork_review', 'printing', 'in_stock', 'distributing'])
+        .order('run_code')
+
+      if (runsError || !runRows) {
+        console.error('Could not load production runs', runsError)
+        if (!cancelled) setRunsLoading(false)
+        return
+      }
+
+      const runIds = runRows.map((row) => row.id)
+      const { data: cells, error: cellsError } = runIds.length
+        ? await supabase
+            .from('ad_cells')
+            .select('production_run_id,panel,row_index,col_index,status')
+            .in('production_run_id', runIds)
+        : { data: [], error: null }
+
+      if (cellsError) {
+        console.error('Could not load advertising cells', cellsError)
+      }
+
+      const mapped = runRows.flatMap((row) => {
+        const bag = Array.isArray(row.bag_sizes) ? row.bag_sizes[0] : row.bag_sizes
+        if (!bag) return []
+
+        const soldByPanel: Record<PanelKey, string[]> = {
+          front: [],
+          right: [],
+          back: [],
+          left: [],
+        }
+
+        for (const cell of cells ?? []) {
+          if (cell.production_run_id !== row.id || cell.status === 'available') continue
+          soldByPanel[cell.panel].push(`${cell.row_index}-${cell.col_index}`)
+        }
+
+        const start = row.estimated_start_date
+          ? new Date(`${row.estimated_start_date}T00:00:00`).toLocaleDateString('en-GB', {
+              month: 'long',
+              year: 'numeric',
+            })
+          : 'TBC'
+
+        return [{
+          id: row.run_code,
+          dbId: row.id,
+          size: bag.name as BagRun['size'],
+          dimensions: `${bag.front_width_mm} × ${bag.front_width_mm + bag.side_gusset_mm} × ${bag.height_mm} mm`,
+          faceWidth: bag.front_width_mm,
+          sideWidth: bag.side_gusset_mm,
+          height: bag.height_mm,
+          totalBagSquares: bag.total_square_count,
+          estimatedStart: start,
+          pricePerSquarePence: row.price_per_square_pence,
+          soldByPanel,
+        }]
+      })
+
+      if (!cancelled && mapped.length) {
+        setRuns(mapped)
+        setRunId((current) => mapped.some((item) => item.id === current) ? current : mapped[0].id)
+      }
+
+      if (!cancelled) setRunsLoading(false)
+    }
+
+    loadRuns()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const previewBlocked = useMemo(
     () => Boolean(preview && rectCells(preview).some((key) => soldCells.has(key))),
@@ -314,7 +421,7 @@ export default function App() {
         </div>
 
         <div className="run-options">
-          {BAG_RUNS.map((item) => {
+          {runs.map((item) => {
             const sold = PANEL_ORDER.reduce((sum, key) => sum + item.soldByPanel[key].length, 0)
             const availability = Math.round(((item.totalBagSquares - sold) / item.totalBagSquares) * 100)
 
@@ -357,7 +464,7 @@ export default function App() {
 
         <div className="takeaway-layout">
           <div className="takeaway-products">
-            {BAG_RUNS.map((item) => (
+            {runs.map((item) => (
               <article className="takeaway-product" key={item.id}>
                 <div className="mini-bag" style={{ aspectRatio: `${item.faceWidth} / ${item.height}` }}>
                   <span>{item.size}</span>
@@ -387,7 +494,7 @@ export default function App() {
             <span className="summary-label">box{totalBoxes === 1 ? '' : 'es'} · {totalBags.toLocaleString()} bags</span>
 
             <div className="summary-lines">
-              {BAG_RUNS.filter((item) => bagBoxes[item.id] > 0).map((item) => (
+              {runs.filter((item) => bagBoxes[item.id] > 0).map((item) => (
                 <div key={item.id}>
                   <span>{item.size}</span>
                   <strong>{bagBoxes[item.id]} × 250</strong>
@@ -417,8 +524,9 @@ export default function App() {
             advert can be any rectangular block that fits around space already sold.
           </p>
 
+          {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
           <div className="run-switcher" aria-label="Choose bag run">
-            {BAG_RUNS.map((item) => (
+            {runs.map((item) => (
               <button
                 key={item.id}
                 className={runId === item.id ? 'active' : ''}
@@ -477,13 +585,13 @@ export default function App() {
             </div>
             <div className="quote-row">
               <span>Demo price / square</span>
-              <strong>£{DEMO_SQUARE_PRICE}</strong>
+              <strong>£{(squarePricePence / 100).toFixed(2)}</strong>
             </div>
             <div className="quote-total">
               <span>Demo total</span>
-              <strong>£{(selectedCount * DEMO_SQUARE_PRICE).toLocaleString()}</strong>
+              <strong>£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
             </div>
-            <small>Pricing is still a prototype value. The same square price will apply across every bag size and face.</small>
+            <small>Live pricing is loaded from the production run. The same square price applies across every bag face.</small>
           </div>
 
           <div className="selector-actions">
@@ -670,7 +778,7 @@ export default function App() {
               <div><span>Bag face</span><strong>{panel.label}</strong></div>
               <div><span>Ad shape</span><strong>{shapeLabel(selection)}</strong></div>
               <div><span>3 cm squares</span><strong>{selectedCount}</strong></div>
-              <div><span>Prototype price</span><strong>£{(selectedCount * DEMO_SQUARE_PRICE).toLocaleString()}</strong></div>
+              <div><span>Current price</span><strong>£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
             </div>
 
             <div className="checkout-notice">
