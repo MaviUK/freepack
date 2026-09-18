@@ -13,6 +13,7 @@ import {
   RotateCcw,
   ShoppingBag,
   Truck,
+  UserRound,
   X,
 } from 'lucide-react'
 import { supabase } from './supabase'
@@ -166,6 +167,17 @@ export default function App() {
   const [selection, setSelection] = useState<Rect | null>(null)
   const [artwork, setArtwork] = useState<string | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authMessage, setAuthMessage] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
+  const [artworkFile, setArtworkFile] = useState<File | null>(null)
+  const [reservationLoading, setReservationLoading] = useState(false)
+  const [reservationMessage, setReservationMessage] = useState('')
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(null)
   const [bagBoxes, setBagBoxes] = useState<Record<string, number>>({
     'S-001': 0,
     'M-001': 0,
@@ -188,6 +200,19 @@ export default function App() {
   const totalAvailable = run.totalBagSquares - totalSold
   const totalAvailability = Math.round((totalAvailable / run.totalBagSquares) * 100)
   const squarePricePence = run.pricePerSquarePence ?? DEMO_SQUARE_PRICE * 100
+
+  useEffect(() => {
+    supabase.auth.getClaims().then(({ data }) => {
+      setUserId(data.claims?.sub ?? null)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async () => {
+      const { data } = await supabase.auth.getClaims()
+      setUserId(data.claims?.sub ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -314,6 +339,8 @@ export default function App() {
     setPreview(null)
     setSelection(null)
     setArtwork(null)
+    setArtworkFile(null)
+    setReservationMessage('')
     setCheckoutOpen(false)
   }
 
@@ -363,9 +390,102 @@ export default function App() {
 
   function uploadArtwork(file?: File) {
     if (!file || !selection) return
+    setArtworkFile(file)
     const reader = new FileReader()
     reader.onload = () => setArtwork(String(reader.result))
     reader.readAsDataURL(file)
+  }
+
+  async function handleAuth(event: React.FormEvent) {
+    event.preventDefault()
+    setAuthLoading(true)
+    setAuthMessage('')
+
+    const result = authMode === 'signup'
+      ? await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: { data: { display_name: authEmail.split('@')[0] } },
+        })
+      : await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        })
+
+    if (result.error) {
+      setAuthMessage(result.error.message)
+    } else if (authMode === 'signup' && !result.data.session) {
+      setAuthMessage('Account created. Check your email to confirm your address, then sign in.')
+    } else {
+      setAuthOpen(false)
+      setAuthMessage('')
+    }
+
+    setAuthLoading(false)
+  }
+
+  async function reserveSelection() {
+    if (!selection || !artworkFile || !run.dbId) return
+
+    if (!userId) {
+      setCheckoutOpen(false)
+      setAuthMode('signup')
+      setAuthOpen(true)
+      setAuthMessage('Create an account or sign in before reserving this space.')
+      return
+    }
+
+    setReservationLoading(true)
+    setReservationMessage('')
+
+    const { data: booking, error: bookingError } = await supabase.rpc('reserve_ad_space', {
+      p_run_id: run.dbId,
+      p_panel: panelKey,
+      p_top_row: selection.top,
+      p_left_col: selection.left,
+      p_width: selection.right - selection.left + 1,
+      p_height: selection.bottom - selection.top + 1,
+    })
+
+    if (bookingError || !booking) {
+      setReservationMessage(bookingError?.message ?? 'Could not reserve this space.')
+      setReservationLoading(false)
+      return
+    }
+
+    const bookingId = booking.id
+    const extension = artworkFile.name.split('.').pop()?.toLowerCase() || 'bin'
+    const path = `${userId}/${bookingId}/artwork.${extension}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('ad-artwork')
+      .upload(path, artworkFile, {
+        upsert: false,
+        contentType: artworkFile.type || undefined,
+      })
+
+    if (uploadError) {
+      await supabase.rpc('release_ad_reservation', { p_booking_id: bookingId })
+      setReservationMessage(`Artwork upload failed: ${uploadError.message}`)
+      setReservationLoading(false)
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('ad_bookings')
+      .update({ artwork_path: path, updated_at: new Date().toISOString() })
+      .eq('id', bookingId)
+
+    if (updateError) {
+      await supabase.rpc('release_ad_reservation', { p_booking_id: bookingId })
+      setReservationMessage(`Reservation could not be completed: ${updateError.message}`)
+      setReservationLoading(false)
+      return
+    }
+
+    setActiveBookingId(bookingId)
+    setReservationMessage('Reserved for 15 minutes. Payment is the next step.')
+    setReservationLoading(false)
   }
 
   return (
@@ -377,7 +497,15 @@ export default function App() {
           <a href="#bags">Free bags</a>
           <a href="#advertise">Advertise</a>
         </nav>
-        <button className="button button-dark">Sign in</button>
+        {userId ? (
+          <button className="button button-dark" onClick={() => supabase.auth.signOut()}>
+            Sign out
+          </button>
+        ) : (
+          <button className="button button-dark" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>
+            Sign in
+          </button>
+        )}
       </header>
 
       <section className="hero shell">
@@ -740,6 +868,66 @@ export default function App() {
         </div>
       </section>
 
+      {authOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
+          <section
+            className="checkout-modal auth-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={authMode === 'signin' ? 'Sign in' : 'Create account'}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setAuthOpen(false)} aria-label="Close">
+              <X size={20} />
+            </button>
+            <div className="checkout-icon"><UserRound size={22} /></div>
+            <p className="kicker">FREEPACK ACCOUNT</p>
+            <h2>{authMode === 'signin' ? 'Sign in' : 'Create your account'}</h2>
+            <p className="checkout-intro">
+              Use one account for advertising bookings or free takeaway bag orders.
+            </p>
+
+            <form className="auth-form" onSubmit={handleAuth}>
+              <label>
+                Email
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="you@company.co.uk"
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="At least 6 characters"
+                />
+              </label>
+              {authMessage && <div className="auth-message">{authMessage}</div>}
+              <button className="button button-dark modal-primary" disabled={authLoading}>
+                {authLoading ? 'Please wait…' : authMode === 'signin' ? 'Sign in' : 'Create account'}
+              </button>
+            </form>
+
+            <button
+              className="auth-switch"
+              onClick={() => {
+                setAuthMode(authMode === 'signin' ? 'signup' : 'signin')
+                setAuthMessage('')
+              }}
+            >
+              {authMode === 'signin' ? 'New to Freepack? Create an account' : 'Already have an account? Sign in'}
+            </button>
+          </section>
+        </div>
+      )}
+
       {checkoutOpen && selection && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setCheckoutOpen(false)}>
           <section
@@ -785,8 +973,24 @@ export default function App() {
               This is the prototype checkout flow. Live reservations, advertiser accounts and payment will be connected to the backend next.
             </div>
 
-            <button className="button button-dark modal-primary" onClick={() => setCheckoutOpen(false)}>
-              Looks good
+            {reservationMessage && (
+              <div className={`reservation-message ${activeBookingId ? 'success' : ''}`}>
+                {reservationMessage}
+              </div>
+            )}
+
+            <button
+              className="button button-dark modal-primary"
+              onClick={reserveSelection}
+              disabled={reservationLoading || Boolean(activeBookingId)}
+            >
+              {activeBookingId
+                ? 'Space reserved'
+                : reservationLoading
+                  ? 'Reserving…'
+                  : userId
+                    ? 'Reserve for 15 minutes'
+                    : 'Sign in & reserve'}
             </button>
           </section>
         </div>
