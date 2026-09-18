@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react'
+import Bag3D from './Bag3D'
 import { supabase } from './supabase'
 
 const DEMO_SQUARE_PRICE = 192
@@ -838,40 +839,16 @@ export default function App() {
     changePanel(PANEL_ORDER[nextIndex])
   }
 
-  function pointFromGridPointer(event: React.PointerEvent<HTMLDivElement>): Point | null {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const styles = window.getComputedStyle(event.currentTarget)
-    const gap = Number.parseFloat(styles.columnGap || '0') || 0
-    const rowGap = Number.parseFloat(styles.rowGap || '0') || gap
-    const cellWidth = (rect.width - gap * (panel.cols - 1)) / panel.cols
-    const cellHeight = (rect.height - rowGap * (panel.rows - 1)) / panel.rows
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
-
-    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null
-
-    const col = Math.min(panel.cols - 1, Math.max(0, Math.floor(x / (cellWidth + gap))))
-    const row = Math.min(panel.rows - 1, Math.max(0, Math.floor(y / (cellHeight + rowGap))))
-
-    const colOffset = x - col * (cellWidth + gap)
-    const rowOffset = y - row * (cellHeight + rowGap)
-
-    if (colOffset > cellWidth || rowOffset > cellHeight) return null
-    return { row, col }
-  }
-
-  function handleGridTap(event: React.PointerEvent<HTMLDivElement>) {
-    event.preventDefault()
-    const point = pointFromGridPointer(event)
-    if (point) chooseGridCell(point)
-  }
-
-  function chooseGridCell(point: Point) {
+  function chooseGridCell(targetPanel: PanelKey, point: Point) {
+    const targetSoldCells = new Set(run.soldByPanel[targetPanel])
     const key = `${point.row}-${point.col}`
-    if (soldCells.has(key)) return
+    if (targetSoldCells.has(key)) return
 
-    if (!selection) {
+    const changingPanel = targetPanel !== panelKey
+
+    if (!selection || changingPanel) {
       const rect = makeRect(point, point)
+      if (changingPanel) setPanelKey(targetPanel)
       setPreview(rect)
       setSelection(rect)
       setPlacementMessage('1 × 1 selected. Tap a free square directly beside it to add a row or column.')
@@ -926,8 +903,9 @@ export default function App() {
       return
     }
 
-    const addedCells = rectCells(next).filter((cellKey) => !rectCells(selection).includes(cellKey))
-    const blocked = addedCells.some((cellKey) => soldCells.has(cellKey))
+    const currentCells = new Set(rectCells(selection))
+    const addedCells = rectCells(next).filter((cellKey) => !currentCells.has(cellKey))
+    const blocked = addedCells.some((cellKey) => targetSoldCells.has(cellKey))
 
     if (blocked) {
       setPlacementMessage('That row or column includes space that is already taken.')
@@ -1416,115 +1394,27 @@ export default function App() {
           {!artwork && selection && <p className="checkout-hint">Upload artwork to continue.</p>}
         </div>
 
-        <div className="bag-wrap">
-          <div className="surface-control">
-            <button onClick={() => rotatePanel(-1)} aria-label="Previous bag face"><ArrowLeft size={17} /></button>
-            <span>{panel.label}</span>
-            <button onClick={() => rotatePanel(1)} aria-label="Next bag face"><ArrowRight size={17} /></button>
-          </div>
-
-          <div
-            className={`bag-scene bag-scene-${panelKey}`}
-            style={{
-              '--bag-face-width': `${panel.widthMm * BAG_DISPLAY_SCALE}px`,
-              '--bag-face-ratio': `${panel.widthMm} / ${run.height}`,
-              '--bag-depth': `${Math.max(28, Math.min(82, run.sideWidth * BAG_DISPLAY_SCALE * 0.52))}px`,
-            } as React.CSSProperties}
-          >
-            <div className="bag-3d">
-              <div className="bag-side-plane" aria-hidden="true">
-                <div className="bag-side-gusset-line" />
-              </div>
-              <div className="bag-bottom-plane" aria-hidden="true" />
-
-              <div className={`bag-face bag-face-${panelKey}`}>
-                <div className="bag-top-fold" aria-hidden="true" />
-                <div className="bag-label"><Box size={16} /> {run.size.toUpperCase()} · {run.id} · {panel.label.toUpperCase()}</div>
-
-                <div className="bag-print-area">
-                  <div
-                    className="grid"
-                    aria-label={`${panel.label} advertising grid selector`}
-                    onPointerUp={handleGridTap}
-                    style={{
-                      gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
-                      gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
-                    }}
-                  >
-                    {Array.from({ length: panel.rows * panel.cols }, (_, index) => {
-                      const row = Math.floor(index / panel.cols)
-                      const col = index % panel.cols
-                      const key = `${row}-${col}`
-                      const sold = soldCells.has(key)
-
-                      return (
-                        <button
-                          key={key}
-                          className={[
-                            'grid-cell',
-                            sold ? 'sold' : 'available',
-                          ].join(' ')}
-                          aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
-                          tabIndex={-1}
-                        >
-                          {sold ? <><Check size={11} /> SOLD</> : '+'}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {selection && selectionStyle && (
-                    <div
-                      className={`artwork-overlay artwork-overlay-absolute ${artwork ? 'has-artwork' : ''}`}
-                      style={{
-                        ...selectionStyle,
-                        backgroundImage: artwork ? `url("${artwork}")` : undefined,
-                      }}
-                    >
-                      {!artwork && (
-                        <span>
-                          {shapeLabel(selection)}
-                          <small>{selectedCount} square{selectedCount === 1 ? '' : 's'}</small>
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="bag-key">
-                  <span><i className="key-available" /> Available</span>
-                  <span><i className="key-sold" /> Sold</span>
-                  <span><i className="key-selected" /> Your space</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="panel-map" aria-label="Bag face overview">
-            {PANEL_ORDER.map((key) => {
-              const face = panels[key]
-              const sold = run.soldByPanel[key].length
-              const total = face.cols * face.rows
-              return (
-                <button
-                  key={key}
-                  className={panelKey === key ? 'active' : ''}
-                  onClick={() => changePanel(key)}
-                >
-                  <span>{face.shortLabel}</span>
-                  <strong>{total - sold}/{total}</strong>
-                </button>
-              )
-            })}
-          </div>
+        <div className="bag-wrap bag-wrap-true3d">
+          <Bag3D
+            widthMm={run.faceWidth}
+            depthMm={run.sideWidth}
+            heightMm={run.height}
+            panels={panels}
+            soldByPanel={run.soldByPanel}
+            activePanel={panelKey}
+            selection={selection}
+            artwork={artwork}
+            onPanelChange={(key) => setPanelKey(key)}
+            onCellSelect={chooseGridCell}
+          />
 
           {placementMessage && (
             <div className="selection-warning">{placementMessage}</div>
           )}
           <p className="bag-help">
             {selection
-              ? `Selected: ${shapeLabel(selection)}. Tap a free square directly beside any outside edge to add one row or column.`
-              : 'Tap any available square on the 3D bag to start with 1 × 1.'}
+              ? `Selected: ${shapeLabel(selection)} on ${panel.label}. Rotate the bag and tap a free square beside the selected edge to grow it.`
+              : 'Rotate the bag freely, then tap any available grid square to start with 1 × 1.'}
           </p>
         </div>
       </section>
