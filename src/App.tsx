@@ -1824,10 +1824,10 @@ export default function App() {
                 <input
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
                   value={authPassword}
                   onChange={(event) => setAuthPassword(event.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                 />
               </label>
               {authMessage && <div className="auth-message">{authMessage}</div>}
