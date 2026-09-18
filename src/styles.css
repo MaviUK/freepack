@@ -807,3 +807,36 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   .form-grid label.full { grid-column:auto; }
   .takeaway-order-mini-summary { align-items:flex-start; flex-direction:column; gap:4px; }
 }
+
+
+.takeaway-modal { width:min(560px,100%); }
+.takeaway-modal-summary {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:center;
+  background:#dfe7d8;
+  border-radius:14px;
+  padding:13px 15px;
+  margin-bottom:16px;
+}
+.takeaway-modal-summary strong { font-size:14px; }
+.takeaway-modal-summary span { color:#5f675b; font-size:12px; }
+.auth-form textarea {
+  width:100%;
+  border:1px solid rgba(23,23,19,.13);
+  border-radius:12px;
+  background:#fff;
+  color:#171713;
+  padding:13px 14px;
+  resize:vertical;
+  font:inherit;
+  outline:none;
+}
+.auth-form textarea:focus { border-color:#879b7c; box-shadow:0 0 0 3px rgba(135,155,124,.15); }
+.form-two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.auth-message.success { background:#e4eadf; color:#486141; }
+
+@media (max-width:520px) {
+  .form-two { grid-template-columns:1fr; }
+}
