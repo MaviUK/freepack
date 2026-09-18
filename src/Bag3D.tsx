@@ -34,6 +34,24 @@ type OverlayFace = {
 }
 
 const PANEL_ORDER: BagPanelKey[] = ['front', 'right', 'back', 'left']
+const CELL_MM = 30
+const GAP_MM = 3
+const SAFE_MARGIN_MM = 10
+
+function panelLayout(config: BagPanelConfig, heightMm: number) {
+  const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * GAP_MM
+  const gridHeightMm = config.rows * CELL_MM + Math.max(0, config.rows - 1) * GAP_MM
+  const offsetXmm = Math.max(SAFE_MARGIN_MM, (config.widthMm - gridWidthMm) / 2)
+  const offsetYmm = Math.max(SAFE_MARGIN_MM, (heightMm - gridHeightMm) / 2)
+
+  return {
+    gridWidthMm,
+    gridHeightMm,
+    offsetXmm,
+    offsetYmm,
+    stepMm: CELL_MM + GAP_MM,
+  }
+}
 
 function cellKey(row: number, col: number) {
   return `${row}-${col}`
@@ -297,10 +315,34 @@ export default function Bag3D({
 
       const panel = hit.object.userData.panel as BagPanelKey
       const config = panels[panel]
+      const layout = panelLayout(config, heightMm)
       const u = THREE.MathUtils.clamp(hit.uv.x, 0, 0.999999)
       const v = THREE.MathUtils.clamp(hit.uv.y, 0, 0.999999)
-      const col = Math.floor(u * config.cols)
-      const row = Math.floor((1 - v) * config.rows)
+
+      const xMm = u * config.widthMm
+      const yMm = (1 - v) * heightMm
+      const localX = xMm - layout.offsetXmm
+      const localY = yMm - layout.offsetYmm
+
+      if (
+        localX < 0 ||
+        localY < 0 ||
+        localX > layout.gridWidthMm ||
+        localY > layout.gridHeightMm
+      ) {
+        return null
+      }
+
+      const col = Math.floor(localX / layout.stepMm)
+      const row = Math.floor(localY / layout.stepMm)
+
+      if (col < 0 || col >= config.cols || row < 0 || row >= config.rows) return null
+
+      const withinCellX = localX - col * layout.stepMm
+      const withinCellY = localY - row * layout.stepMm
+
+      // The 3mm physical gap is intentionally not clickable.
+      if (withinCellX > CELL_MM || withinCellY > CELL_MM) return null
 
       return { panel, point: { row, col } }
     }
@@ -428,36 +470,51 @@ export default function Bag3D({
         const { canvas, ctx, texture } = overlay
         const cols = config.cols
         const rows = config.rows
-        const cellW = canvas.width / cols
-        const cellH = canvas.height / rows
+        const layout = panelLayout(config, heightMm)
+        const pxPerMmX = canvas.width / config.widthMm
+        const pxPerMmY = canvas.height / heightMm
+        const cellW = CELL_MM * pxPerMmX
+        const cellH = CELL_MM * pxPerMmY
+        const stepX = layout.stepMm * pxPerMmX
+        const stepY = layout.stepMm * pxPerMmY
+        const originX = layout.offsetXmm * pxPerMmX
+        const originY = layout.offsetYmm * pxPerMmY
 
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
+        // Draw the 10mm minimum safe-print boundary at real scale.
+        ctx.save()
+        ctx.strokeStyle = 'rgba(67,48,26,0.16)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([5, 5])
+        ctx.strokeRect(
+          SAFE_MARGIN_MM * pxPerMmX,
+          SAFE_MARGIN_MM * pxPerMmY,
+          canvas.width - SAFE_MARGIN_MM * 2 * pxPerMmX,
+          canvas.height - SAFE_MARGIN_MM * 2 * pxPerMmY,
+        )
+        ctx.restore()
+
         for (let row = 0; row < rows; row += 1) {
           for (let col = 0; col < cols; col += 1) {
-            const x = col * cellW
-            const y = row * cellH
+            const x = originX + col * stepX
+            const y = originY + row * stepY
             const sold = soldByPanel[panel].includes(cellKey(row, col))
-            const selected = panel === activePanel && selectionContains(selection, row, col)
 
             ctx.fillStyle = sold
-              ? 'rgba(244,239,229,0.88)'
-              : selected
-                ? 'rgba(113,145,102,0.78)'
-                : 'rgba(255,255,255,0.055)'
-            ctx.fillRect(x + 1.5, y + 1.5, cellW - 3, cellH - 3)
+              ? 'rgba(244,239,229,0.90)'
+              : 'rgba(255,255,255,0.055)'
+            ctx.fillRect(x, y, cellW, cellH)
 
-            ctx.strokeStyle = selected
-              ? 'rgba(43,70,37,0.95)'
-              : sold
-                ? 'rgba(96,84,63,0.75)'
-                : 'rgba(65,45,22,0.55)'
-            ctx.lineWidth = selected ? 2.5 : 1.2
-            ctx.setLineDash(selected || sold ? [] : [5, 5])
-            ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4)
+            ctx.strokeStyle = sold
+              ? 'rgba(96,84,63,0.78)'
+              : 'rgba(65,45,22,0.55)'
+            ctx.lineWidth = sold ? 1.8 : 1.15
+            ctx.setLineDash(sold ? [] : [5, 5])
+            ctx.strokeRect(x, y, cellW, cellH)
             ctx.setLineDash([])
 
-            if (sold && cellW > 36 && cellH > 28) {
+            if (sold && cellW > 34 && cellH > 26) {
               ctx.fillStyle = 'rgba(79,73,61,0.88)'
               ctx.font = `700 ${Math.max(9, Math.min(14, cellH * 0.16))}px system-ui, sans-serif`
               ctx.textAlign = 'center'
@@ -468,19 +525,27 @@ export default function Bag3D({
         }
 
         if (panel === activePanel && selection) {
-          const x = selection.left * cellW
-          const y = selection.top * cellH
-          const width = (selection.right - selection.left + 1) * cellW
-          const height = (selection.bottom - selection.top + 1) * cellH
+          const selectedCols = selection.right - selection.left + 1
+          const selectedRows = selection.bottom - selection.top + 1
+          const x = originX + selection.left * stepX
+          const y = originY + selection.top * stepY
+          const widthMm = selectedCols * CELL_MM + Math.max(0, selectedCols - 1) * GAP_MM
+          const heightSelectedMm = selectedRows * CELL_MM + Math.max(0, selectedRows - 1) * GAP_MM
+          const width = widthMm * pxPerMmX
+          const height = heightSelectedMm * pxPerMmY
+
+          // One advertiser gets one continuous rectangle: no internal 3mm gaps.
+          ctx.save()
+          ctx.fillStyle = artworkImage && artworkImage.complete
+            ? '#ffffff'
+            : 'rgba(113,145,102,0.82)'
+          ctx.fillRect(x, y, width, height)
 
           if (artworkImage && artworkImage.complete) {
-            ctx.save()
-            ctx.fillStyle = '#ffffff'
-            ctx.fillRect(x + 3, y + 3, width - 6, height - 6)
-
+            const padding = Math.max(5, Math.min(width, height) * 0.035)
             const scale = Math.min(
-              (width - 10) / artworkImage.naturalWidth,
-              (height - 10) / artworkImage.naturalHeight,
+              (width - padding * 2) / artworkImage.naturalWidth,
+              (height - padding * 2) / artworkImage.naturalHeight,
             )
             const drawW = artworkImage.naturalWidth * scale
             const drawH = artworkImage.naturalHeight * scale
@@ -491,12 +556,12 @@ export default function Bag3D({
               drawW,
               drawH,
             )
-            ctx.restore()
           }
 
           ctx.strokeStyle = '#29472a'
-          ctx.lineWidth = 5
-          ctx.strokeRect(x + 2.5, y + 2.5, width - 5, height - 5)
+          ctx.lineWidth = 4
+          ctx.strokeRect(x + 2, y + 2, width - 4, height - 4)
+          ctx.restore()
         }
 
         texture.needsUpdate = true
@@ -564,7 +629,7 @@ export default function Bag3D({
       </button>
 
       <div className="bag3d-hint">
-        Drag to rotate in any direction · scroll to zoom · tap a grid square to select
+        3cm units at physical scale · 3mm gaps · drag to rotate · tap a square to select
       </div>
     </div>
   )
