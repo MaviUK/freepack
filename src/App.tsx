@@ -829,6 +829,34 @@ export default function App() {
     changePanel(PANEL_ORDER[nextIndex])
   }
 
+  function pointFromGridPointer(event: React.PointerEvent<HTMLDivElement>): Point | null {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const styles = window.getComputedStyle(event.currentTarget)
+    const gap = Number.parseFloat(styles.columnGap || '0') || 0
+    const rowGap = Number.parseFloat(styles.rowGap || '0') || gap
+    const cellWidth = (rect.width - gap * (panel.cols - 1)) / panel.cols
+    const cellHeight = (rect.height - rowGap * (panel.rows - 1)) / panel.rows
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null
+
+    const col = Math.min(panel.cols - 1, Math.max(0, Math.floor(x / (cellWidth + gap))))
+    const row = Math.min(panel.rows - 1, Math.max(0, Math.floor(y / (cellHeight + rowGap))))
+
+    const colOffset = x - col * (cellWidth + gap)
+    const rowOffset = y - row * (cellHeight + rowGap)
+
+    if (colOffset > cellWidth || rowOffset > cellHeight) return null
+    return { row, col }
+  }
+
+  function handleGridTap(event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const point = pointFromGridPointer(event)
+    if (point) chooseGridCell(point)
+  }
+
   function chooseGridCell(point: Point) {
     const key = `${point.row}-${point.col}`
     if (soldCells.has(key)) return
@@ -853,7 +881,7 @@ export default function App() {
       point.col <= selection.right
 
     if (isInside) {
-      setPlacementMessage('That square is already inside your advert. Tap a free square directly beside an outside edge to make it bigger.')
+      setPlacementMessage('Tap the next free square outside the selected edge to add a row or column.')
       return
     }
 
@@ -1398,6 +1426,7 @@ export default function App() {
             <div
               className="grid"
               aria-label={`${panel.label} advertising grid selector`}
+              onPointerUp={handleGridTap}
               style={{
                 gridTemplateColumns: `repeat(${panel.cols}, 1fr)`,
                 gridTemplateRows: `repeat(${panel.rows}, 1fr)`,
@@ -1425,7 +1454,7 @@ export default function App() {
                       inPreview ? (previewBlocked ? 'blocked-preview' : 'selection-preview') : '',
                     ].join(' ')}
                     aria-label={sold ? 'Sold advertising space' : `Available advertising space row ${row + 1}, column ${col + 1}`}
-                    onClick={() => !sold && chooseGridCell({ row, col })}
+                    tabIndex={-1}
                   >
                     {sold ? <><Check size={11} /> SOLD</> : '+'}
                   </button>
