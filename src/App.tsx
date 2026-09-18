@@ -178,6 +178,8 @@ export default function App() {
   const [reservationLoading, setReservationLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [paymentBanner, setPaymentBanner] = useState('')
   const [takeawayOpen, setTakeawayOpen] = useState(false)
   const [takeawayLoading, setTakeawayLoading] = useState(false)
   const [takeawayMessage, setTakeawayMessage] = useState('')
@@ -227,6 +229,14 @@ export default function App() {
   const squarePricePence = run.pricePerSquarePence ?? DEMO_SQUARE_PRICE * 100
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment')
+    if (payment === 'success') {
+      setPaymentBanner('Payment received. Your advertising space is being confirmed.')
+    } else if (payment === 'cancelled') {
+      setPaymentBanner('Payment was cancelled. Your reserved space remains held until the reservation expires.')
+    }
+
     supabase.auth.getClaims().then(({ data }) => {
       setUserId(data.claims?.sub ?? null)
     })
@@ -366,6 +376,7 @@ export default function App() {
     setArtwork(null)
     setArtworkFile(null)
     setReservationMessage('')
+    setActiveBookingId(null)
     setCheckoutOpen(false)
   }
 
@@ -557,6 +568,28 @@ export default function App() {
     setTakeawayLoading(false)
   }
 
+  async function startStripeCheckout() {
+    if (!activeBookingId) return
+    setCheckoutLoading(true)
+    setReservationMessage('')
+
+    const { data, error } = await supabase.functions.invoke('create-ad-checkout', {
+      body: {
+        booking_id: activeBookingId,
+        return_origin: window.location.origin,
+      },
+    })
+
+    if (error || !data?.url) {
+      const message = data?.error || error?.message || 'Could not open Stripe Checkout.'
+      setReservationMessage(message)
+      setCheckoutLoading(false)
+      return
+    }
+
+    window.location.assign(data.url)
+  }
+
   async function reserveSelection() {
     if (!selection || !artworkFile || !run.dbId) return
 
@@ -617,12 +650,18 @@ export default function App() {
     }
 
     setActiveBookingId(bookingId)
-    setReservationMessage('Reserved for 15 minutes. Payment is the next step.')
+    setReservationMessage('Reserved. Complete payment to secure the space.')
     setReservationLoading(false)
   }
 
   return (
     <main>
+      {paymentBanner && (
+        <div className="payment-banner">
+          <span>{paymentBanner}</span>
+          <button onClick={() => setPaymentBanner('')} aria-label="Dismiss payment message"><X size={16} /></button>
+        </div>
+      )}
       <header className="nav shell">
         <a className="brand" href="#" aria-label="freepack home">freepack.</a>
         <nav>
@@ -1224,7 +1263,7 @@ export default function App() {
             </div>
 
             <div className="checkout-notice">
-              This is the prototype checkout flow. Live reservations, advertiser accounts and payment will be connected to the backend next.
+              Your selected cells are reserved while you complete checkout. Stripe handles the card payment securely; Freepack never receives your card details.
             </div>
 
             {reservationMessage && (
@@ -1233,19 +1272,27 @@ export default function App() {
               </div>
             )}
 
-            <button
-              className="button button-dark modal-primary"
-              onClick={reserveSelection}
-              disabled={reservationLoading || Boolean(activeBookingId)}
-            >
-              {activeBookingId
-                ? 'Space reserved'
-                : reservationLoading
+            {!activeBookingId ? (
+              <button
+                className="button button-dark modal-primary"
+                onClick={reserveSelection}
+                disabled={reservationLoading}
+              >
+                {reservationLoading
                   ? 'Reserving…'
                   : userId
-                    ? 'Reserve for 15 minutes'
+                    ? 'Reserve space'
                     : 'Sign in & reserve'}
-            </button>
+              </button>
+            ) : (
+              <button
+                className="button stripe-pay-button modal-primary"
+                onClick={startStripeCheckout}
+                disabled={checkoutLoading}
+              >
+                {checkoutLoading ? 'Opening Stripe…' : 'Pay securely with Stripe'}
+              </button>
+            )}
           </section>
         </div>
       )}
