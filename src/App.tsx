@@ -270,6 +270,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [authMessage, setAuthMessage] = useState('')
+  const [authReturnTo, setAuthReturnTo] = useState<'advertiser' | 'takeaway' | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [artworkFile, setArtworkFile] = useState<File | null>(null)
   const [reservationLoading, setReservationLoading] = useState(false)
@@ -956,6 +957,21 @@ export default function App() {
     reader.readAsDataURL(file)
   }
 
+  function finishAuthFlow() {
+    setAuthOpen(false)
+    setAuthMessage('')
+
+    if (authReturnTo === 'advertiser' && selection && artworkFile) {
+      setCheckoutOpen(true)
+    }
+
+    if (authReturnTo === 'takeaway' && totalBoxes > 0) {
+      setTakeawayCheckoutOpen(true)
+    }
+
+    setAuthReturnTo(null)
+  }
+
   async function handleAuth(event: React.FormEvent) {
     event.preventDefault()
     setAuthLoading(true)
@@ -989,8 +1005,7 @@ export default function App() {
         })
 
         if (!signInAttempt.error) {
-          setAuthOpen(false)
-          setAuthMessage('')
+          finishAuthFlow()
         } else if (/already exists|already registered|sign in instead/i.test(functionMessage)) {
           setAuthMode('signin')
           setAuthMessage('That email already has a FreePack account. Sign in with your existing password.')
@@ -1009,8 +1024,7 @@ export default function App() {
       if (result.error) {
         setAuthMessage(result.error.message)
       } else {
-        setAuthOpen(false)
-        setAuthMessage('')
+        finishAuthFlow()
       }
     }
 
@@ -1021,6 +1035,7 @@ export default function App() {
     if (totalBoxes === 0) return
     if (!userId) {
       setAuthMode('signup')
+      setAuthReturnTo('takeaway')
       setAuthOpen(true)
       setAuthMessage('Create an account or sign in before placing a free bag order.')
       return
@@ -1034,6 +1049,7 @@ export default function App() {
     if (!userId) {
       setTakeawayCheckoutOpen(false)
       setAuthMode('signin')
+      setAuthReturnTo('takeaway')
       setAuthOpen(true)
       setAuthMessage('Sign in to submit your bag order.')
       return
@@ -1105,6 +1121,7 @@ export default function App() {
     if (!userId) {
       setCheckoutOpen(false)
       setAuthMode('signup')
+      setAuthReturnTo('advertiser')
       setAuthOpen(true)
       setAuthMessage('Create an account or sign in before reserving this space.')
       return
@@ -1190,7 +1207,7 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <button className="button button-dark" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>
+          <button className="button button-dark" onClick={() => { setAuthMode('signin'); setAuthReturnTo(null); setAuthOpen(true) }}>
             Sign in
           </button>
         )}
@@ -1222,7 +1239,7 @@ export default function App() {
           <div className="icon"><Megaphone /></div>
           <p className="kicker">FOR ADVERTISERS</p>
           <h2>Put your brand in<br />customers' hands.</h2>
-          <p>Choose a run, pick a face of the bag, drag across available 3 cm × 3 cm units and upload your artwork.</p>
+          <p>Choose a run, rotate the bag, tap a 3 cm × 3 cm unit and grow a rectangular space directly on the 3D bag before uploading your artwork.</p>
           <a href="#advertise">Try the selector <ArrowRight size={16} /></a>
         </article>
       </section>
@@ -1839,7 +1856,7 @@ export default function App() {
       )}
 
       {authOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAuthOpen(false)}>
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => { setAuthOpen(false); setAuthReturnTo(null) }}>
           <section
             className="checkout-modal auth-modal"
             role="dialog"
@@ -1847,7 +1864,7 @@ export default function App() {
             aria-label={authMode === 'signin' ? 'Sign in' : 'Create account'}
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <button className="modal-close" onClick={() => setAuthOpen(false)} aria-label="Close">
+            <button className="modal-close" onClick={() => { setAuthOpen(false); setAuthReturnTo(null) }} aria-label="Close">
               <X size={20} />
             </button>
             <div className="checkout-icon"><UserRound size={22} /></div>
