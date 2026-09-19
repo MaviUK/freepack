@@ -302,11 +302,14 @@ export type Database = {
           bag_size_id?: string
           created_at?: string
           estimated_start_date?: string | null
+          estimated_stage_date?: string | null
           id?: string
           price_per_square_pence?: number
           reservation_minutes?: number
           run_code?: string
           status?: Database["public"]["Enums"]["run_status"]
+          status_note?: string | null
+          status_updated_at?: string
           updated_at?: string
         }
         Relationships: [
