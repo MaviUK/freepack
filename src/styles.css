@@ -1877,3 +1877,24 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   justify-content:center;
   cursor:pointer;
 }
+
+
+.admin-campaign-actions {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.admin-campaign-actions .button {
+  min-height:36px;
+  justify-content:center;
+}
+@media (max-width:620px) {
+  .admin-campaign-actions {
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .admin-campaign-actions .button {
+    width:100%;
+  }
+}
