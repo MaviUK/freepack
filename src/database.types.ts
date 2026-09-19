@@ -277,6 +277,9 @@ export type Database = {
           reservation_minutes: number
           run_code: string
           status: Database["public"]["Enums"]["run_status"]
+          status_updated_at: string
+          status_note: string | null
+          estimated_stage_date: string | null
           updated_at: string
         }
         Insert: {
@@ -289,6 +292,9 @@ export type Database = {
           reservation_minutes?: number
           run_code: string
           status?: Database["public"]["Enums"]["run_status"]
+          status_updated_at?: string
+          status_note?: string | null
+          estimated_stage_date?: string | null
           updated_at?: string
         }
         Update: {
