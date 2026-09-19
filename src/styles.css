@@ -3557,3 +3557,159 @@ canvas {
     font-size: 8px;
   }
 }
+
+/* ===== COMPACT MOBILE AD SELECTOR ===== */
+@media (max-width: 620px) {
+  .campaign {
+    padding: 30px 14px;
+  }
+
+  .campaign-copy > .kicker {
+    margin-bottom: 6px;
+  }
+
+  .campaign h2 {
+    margin: 6px 0 12px;
+    font-size: 34px;
+    line-height: 1;
+  }
+
+  .campaign .muted {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .run-switcher {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 18px;
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .run-switcher button {
+    min-width: 0;
+    padding: 8px 4px;
+    font-size: 11px;
+    border-radius: 7px;
+  }
+
+  .run-card {
+    margin-top: 8px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    gap: 10px;
+  }
+
+  .run-label {
+    font-size: 8px;
+  }
+
+  .run-card strong {
+    font-size: 12px;
+  }
+
+  .run-card small {
+    font-size: 9px;
+  }
+
+  .run-status {
+    font-size: 9px;
+  }
+
+  .surface-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .surface-tabs button {
+    min-width: 0;
+    padding: 8px 6px;
+    border-radius: 7px;
+  }
+
+  .surface-tabs button span {
+    font-size: 10px;
+  }
+
+  .surface-tabs button small {
+    font-size: 8px;
+  }
+
+  .run-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .run-facts span {
+    min-width: 0;
+    padding: 8px 6px;
+    border-radius: 8px;
+    font-size: 8px;
+    line-height: 1.25;
+  }
+
+  .run-facts strong {
+    font-size: 10px;
+    margin-bottom: 1px;
+  }
+
+  .quote-card {
+    margin-top: 8px;
+    padding: 11px 12px;
+    border-radius: 10px;
+  }
+
+  .quote-row,
+  .quote-total {
+    padding: 5px 0;
+    gap: 12px;
+  }
+
+  .quote-row {
+    font-size: 10px;
+  }
+
+  .quote-total {
+    margin-top: 5px;
+    padding-top: 9px;
+  }
+
+  .quote-total strong {
+    font-size: 19px;
+  }
+
+  .quote-card small {
+    margin-top: 5px;
+    font-size: 8px;
+  }
+
+  .selector-actions {
+    gap: 6px;
+    margin-top: 9px;
+  }
+
+  .selector-actions .button,
+  .reset-button {
+    padding: 10px 11px;
+    font-size: 10px;
+  }
+
+  .checkout-button {
+    margin-top: 8px;
+    padding: 11px 12px;
+    font-size: 11px;
+  }
+
+  .checkout-hint {
+    margin-top: 5px;
+    font-size: 9px;
+  }
+
+  .bag-wrap {
+    min-height: 500px;
+  }
+}
