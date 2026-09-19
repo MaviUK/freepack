@@ -100,6 +100,9 @@ type AdminRun = {
 type AccountBooking = {
   id: string
   status: string
+  artwork_path: string | null
+  artwork_review_status: string
+  artwork_review_notes: string | null
   panel: PanelKey
   square_count: number
   total_pence: number
@@ -356,6 +359,7 @@ export default function App() {
   const [accountLoading, setAccountLoading] = useState(false)
   const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
   const [accountRunSales, setAccountRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
+  const [replacementUploading, setReplacementUploading] = useState<string | null>(null)
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
   const [accountError, setAccountError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
@@ -611,6 +615,43 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel('freepack-booking-reviews')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ad_bookings', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const row = payload.new as {
+            id?: string
+            artwork_path?: string | null
+            artwork_review_status?: string
+            artwork_review_notes?: string | null
+          }
+
+          if (!row.id) return
+
+          setAccountBookings((current) => current.map((booking) =>
+            booking.id === row.id
+              ? {
+                  ...booking,
+                  artwork_path: row.artwork_path ?? booking.artwork_path,
+                  artwork_review_status: row.artwork_review_status ?? booking.artwork_review_status,
+                  artwork_review_notes: row.artwork_review_notes ?? null,
+                }
+              : booking,
+          ))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId])
+
+  useEffect(() => {
     if (!userId || !paymentSessionId) return
 
     const sessionId = paymentSessionId
@@ -708,6 +749,9 @@ export default function App() {
           .select(`
             id,
             status,
+            artwork_path,
+            artwork_review_status,
+            artwork_review_notes,
             panel,
             square_count,
             total_pence,
@@ -945,6 +989,92 @@ export default function App() {
         ? { ...booking, artwork_review_status: status, artwork_review_notes: notes }
         : booking,
     ))
+
+    const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-artwork-review', {
+      body: { booking_id: bookingId },
+    })
+
+    if (notifyError || !notifyData?.ok) {
+      const context = (notifyError as { context?: Response } | null)?.context
+      let message = notifyData?.error || notifyError?.message || 'Artwork review updated, but the advertiser email could not be sent.'
+
+      if (context) {
+        try {
+          const body = await context.clone().json() as { error?: string }
+          if (body?.error) message = body.error
+        } catch {
+          // Keep fallback message.
+        }
+      }
+
+      setAdminMessage(message)
+      return
+    }
+
+    setAdminMessage(notifyData?.sent
+      ? 'Artwork review updated and advertiser notified by email.'
+      : 'Artwork review updated.')
+  }
+
+  async function uploadReplacementArtwork(booking: AccountBooking, file?: File) {
+    if (!file || !userId) return
+
+    const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+    if (!allowedTypes.has(file.type)) {
+      setAccountError('Upload PNG, JPEG, WebP or SVG artwork.')
+      return
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setAccountError('Artwork must be 15 MB or smaller.')
+      return
+    }
+
+    setReplacementUploading(booking.id)
+    setAccountError('')
+
+    const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
+    const path = `${userId}/${booking.id}/replacement-${Date.now()}.${extension}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('ad-artwork')
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      })
+
+    if (uploadError) {
+      setAccountError(uploadError.message)
+      setReplacementUploading(null)
+      return
+    }
+
+    const { data, error } = await supabase.rpc('replace_ad_booking_artwork', {
+      p_booking_id: booking.id,
+      p_artwork_path: path,
+    })
+
+    if (error || !data) {
+      await supabase.storage.from('ad-artwork').remove([path])
+      setAccountError(error?.message || 'Could not submit replacement artwork.')
+      setReplacementUploading(null)
+      return
+    }
+
+    setAccountBookings((current) => current.map((item) =>
+      item.id === booking.id
+        ? {
+            ...item,
+            artwork_path: path,
+            artwork_review_status: 'pending',
+            artwork_review_notes: null,
+          }
+        : item,
+    ))
+
+    setAccountError('')
+    setReplacementUploading(null)
   }
 
   async function updateOrderStatus(orderId: string, status: 'approved' | 'dispatching' | 'dispatched' | 'completed' | 'cancelled') {
@@ -2216,6 +2346,38 @@ export default function App() {
                                 <span>{booking.panel} · {booking.square_count} square{booking.square_count === 1 ? '' : 's'} · £{(booking.total_pence / 100).toFixed(2)}</span>
                               </div>
                               <span className={`status-pill status-${booking.status}`}>{statusLabel}</span>
+                            </div>
+
+                            <div className={`artwork-review-card artwork-review-${booking.artwork_review_status}`}>
+                              <div>
+                                <strong>Artwork</strong>
+                                <span>{booking.artwork_review_status.replaceAll('_', ' ')}</span>
+                              </div>
+                              {booking.artwork_review_notes && <p>{booking.artwork_review_notes}</p>}
+                              {(booking.artwork_review_status === 'changes_requested' || booking.artwork_review_status === 'rejected') && (
+                                <label className="replacement-upload">
+                                  <input
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    hidden
+                                    disabled={replacementUploading === booking.id}
+                                    onChange={(event) => {
+                                      const file = event.target.files?.[0]
+                                      void uploadReplacementArtwork(booking, file)
+                                      event.currentTarget.value = ''
+                                    }}
+                                  />
+                                  <span className="button button-dark">
+                                    {replacementUploading === booking.id ? 'Uploading…' : 'Upload revised artwork'}
+                                  </span>
+                                </label>
+                              )}
+                              {booking.artwork_review_status === 'pending' && booking.artwork_path && (
+                                <small>Your latest artwork is waiting for FreePack review.</small>
+                              )}
+                              {booking.artwork_review_status === 'approved' && (
+                                <small>Approved for this production run.</small>
+                              )}
                             </div>
 
                             <div className="campaign-sales">
