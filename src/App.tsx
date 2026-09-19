@@ -1994,7 +1994,9 @@ export default function App() {
         </div>
       )}
       <header className="nav shell">
-        <a className="brand" href="#" aria-label="freepack home">freepack.</a>
+        <a className="brand" href="#" aria-label="Freepack home">
+          <img src="/freepack-logo-white.svg" alt="Freepack" />
+        </a>
         <nav>
           <a href="#how">How it works</a>
           <a href="#bags">Free bags</a>
@@ -2019,16 +2021,30 @@ export default function App() {
       </header>
 
       <section className="hero shell">
-        <div className="eyebrow">PACKAGING PAID FOR BY ADVERTISING</div>
-        <h1>Takeaway bags.<br /><em>Completely free.</em></h1>
-        <p>
-          Restaurants get quality paper bags at no cost. Brands fund each production
-          run by buying advertising space directly on the bags.
-        </p>
-        <div className="hero-actions">
-          <a className="button button-dark" href="#takeaway-order">Get free bags <ArrowRight size={18} /></a>
-          <a className="button button-light" href="#advertise">Buy ad space</a>
+        <div className="hero-copy">
+          <img className="hero-wordmark" src="/freepack-logo-white.svg" alt="" aria-hidden="true" />
+          <div className="eyebrow">SMART PACKAGING · SHARED REACH</div>
+          <h1>Takeaway bags.<br /><em>Completely free.</em></h1>
+          <p>
+            Restaurants get quality paper bags at no cost. Brands fund each production
+            run by buying advertising space directly on the bags.
+          </p>
+          <div className="hero-actions">
+            <a className="button button-gold" href="#takeaway-order">Get free bags <ArrowRight size={18} /></a>
+            <a className="button button-outline" href="#advertise">Buy ad space</a>
+          </div>
         </div>
+
+        <aside className="hero-manifesto" aria-label="Freepack brand promise">
+          <span className="manifesto-index">01 — 03</span>
+          <div className="manifesto-lines">
+            <strong>LESS WASTE</strong>
+            <strong>MORE REACH</strong>
+            <strong>BETTER PACKAGING</strong>
+          </div>
+          <p>Useful packaging for takeaways. Real-world reach for brands. One shared production model.</p>
+          <span className="manifesto-tagline">GOOD PACKAGING<br />GOES FURTHER.</span>
+        </aside>
       </section>
 
       <section className="split shell" id="how">
@@ -2046,6 +2062,24 @@ export default function App() {
           <h2>Put your brand in<br />customers' hands.</h2>
           <p>Choose a run, rotate the bag, tap a 3 cm × 3 cm unit and grow a rectangular space directly on the 3D bag before uploading your artwork.</p>
           <a href="#advertise">Try the selector <ArrowRight size={16} /></a>
+        </article>
+      </section>
+
+      <section className="brand-promise shell" aria-label="Why Freepack works">
+        <article>
+          <span>01</span>
+          <strong>Better for people</strong>
+          <p>Takeaways get useful, quality packaging without paying for the bags.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <strong>Brighter for brands</strong>
+          <p>Advertisers buy visible space on packaging that moves through the real world.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <strong>Cleaner for tomorrow</strong>
+          <p>Shared production keeps the model simple, useful and focused on less waste.</p>
         </article>
       </section>
 
@@ -3130,9 +3164,14 @@ export default function App() {
         </div>
       )}
 
-      <footer className="shell">
-        <span className="brand">freepack.</span>
-        <span>Free packaging. Paid for by advertising.</span>
+      <footer className="shell site-footer">
+        <a className="footer-brand" href="#" aria-label="Freepack home">
+          <img src="/freepack-logo-navy.svg" alt="Freepack" />
+        </a>
+        <div className="footer-copy">
+          <strong>Good packaging goes further.</strong>
+          <span>Free takeaway packaging. Paid for by advertising.</span>
+        </div>
       </footer>
     </main>
   )
