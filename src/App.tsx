@@ -654,7 +654,7 @@ export default function App() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'ad_bookings', filter: `user_id=eq.${userId}` },
-        (payload) => {
+        async (payload) => {
           const row = payload.new as {
             id?: string
             artwork_path?: string | null
