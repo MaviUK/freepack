@@ -62,13 +62,15 @@ function panelLayout(
 ) {
   const horizontalGapMm = config.cols <= 1
     ? 0
-    : Math.min(
-        GAP_MM,
-        Math.max(
-          0,
-          (config.widthMm - SAFE_MARGIN_MM * 2 - config.cols * CELL_MM) / (config.cols - 1),
-        ),
-      )
+    : config.cols === 6 && config.widthMm <= 200
+      ? 1
+      : Math.min(
+          GAP_MM,
+          Math.max(
+            0,
+            (config.widthMm - SAFE_MARGIN_MM * 2 - config.cols * CELL_MM) / (config.cols - 1),
+          ),
+        )
   const stepXmm = CELL_MM + horizontalGapMm
   const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * horizontalGapMm
   const offsetXmm = Math.max(SAFE_MARGIN_MM, (config.widthMm - gridWidthMm) / 2)
