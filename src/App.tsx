@@ -226,7 +226,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 150,
     sideWidth: 65,
     height: 300,
-    totalBagSquares: 60,
+    totalBagSquares: 64,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
@@ -242,7 +242,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 175,
     sideWidth: 113,
     height: 350,
-    totalBagSquares: 96,
+    totalBagSquares: 104,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -258,7 +258,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 200,
     sideWidth: 115,
     height: 375,
-    totalBagSquares: 112,
+    totalBagSquares: 120,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -274,7 +274,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 138,
     height: 413,
-    totalBagSquares: 200,
+    totalBagSquares: 212,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -351,9 +351,9 @@ function brandRowsByPanelForRun(run: BagRun): Record<PanelKey, number[]> {
   const rows = brandRowsForRun(run)
   return {
     front: rows,
-    right: rows,
+    right: [],
     back: rows,
-    left: rows,
+    left: [],
   }
 }
 
