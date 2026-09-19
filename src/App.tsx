@@ -5,6 +5,7 @@ import {
   Box,
   CalendarDays,
   Check,
+  Download,
   ImagePlus,
   Megaphone,
   Minus,
@@ -18,6 +19,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react'
+import JSZip from 'jszip'
 import Bag3D from './Bag3D'
 import { supabase } from './supabase'
 
@@ -44,6 +46,10 @@ type AdminBooking = {
   artwork_review_notes: string | null
   artwork_path: string | null
   panel: PanelKey
+  top_row: number
+  left_col: number
+  width_cells: number
+  height_cells: number
   square_count: number
   total_pence: number
   created_at: string
@@ -94,7 +100,27 @@ type AdminRun = {
   estimated_start_date: string | null
   price_per_square_pence: number
   bag_quantity: number | null
-  bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
+  bag_sizes: {
+    name: string
+    total_square_count: number
+    front_width_mm: number
+    side_gusset_mm: number
+    height_mm: number
+    front_cols: number
+    front_rows: number
+    side_cols: number
+    side_rows: number
+  } | {
+    name: string
+    total_square_count: number
+    front_width_mm: number
+    side_gusset_mm: number
+    height_mm: number
+    front_cols: number
+    front_rows: number
+    side_cols: number
+    side_rows: number
+  }[] | null
 }
 
 type AccountBooking = {
@@ -370,6 +396,7 @@ export default function App() {
   const [adminOrders, setAdminOrders] = useState<AdminOrder[]>([])
   const [adminRuns, setAdminRuns] = useState<AdminRun[]>([])
   const [adminRunSales, setAdminRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
+  const [adminExportingRun, setAdminExportingRun] = useState<string | null>(null)
   const [adminArtworkUrls, setAdminArtworkUrls] = useState<Record<string, string>>({})
   const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
   const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
@@ -854,6 +881,10 @@ export default function App() {
             artwork_review_notes,
             artwork_path,
             panel,
+            top_row,
+            left_col,
+            width_cells,
+            height_cells,
             square_count,
             total_pence,
             created_at,
@@ -891,7 +922,17 @@ export default function App() {
             estimated_start_date,
             price_per_square_pence,
             bag_quantity,
-            bag_sizes (name, total_square_count)
+            bag_sizes (
+              name,
+              total_square_count,
+              front_width_mm,
+              side_gusset_mm,
+              height_mm,
+              front_cols,
+              front_rows,
+              side_cols,
+              side_rows
+            )
           `)
           .order('run_code'),
       ])
@@ -1091,6 +1132,142 @@ export default function App() {
     setAdminOrders((current) => current.map((order) =>
       order.id === orderId ? { ...order, status } : order,
     ))
+  }
+
+  async function exportProductionPack(run: AdminRun) {
+    const bag = firstRelation(run.bag_sizes)
+    if (!bag) {
+      setAdminMessage('Could not load the bag geometry for this production run.')
+      return
+    }
+
+    const approvedBookings = adminBookings.filter((booking) => {
+      const bookingRun = firstRelation(booking.production_runs)
+      return (
+        bookingRun?.id === run.id &&
+        booking.status === 'paid' &&
+        booking.artwork_review_status === 'approved' &&
+        Boolean(booking.artwork_path)
+      )
+    })
+
+    if (!approvedBookings.length) {
+      setAdminMessage('There are no approved paid artworks to export for this run yet.')
+      return
+    }
+
+    setAdminExportingRun(run.id)
+    setAdminMessage('Building production artwork pack…')
+
+    try {
+      const zip = new JSZip()
+      const rows = [[
+        'booking_reference',
+        'advertiser',
+        'panel',
+        'top_row',
+        'left_column',
+        'width_cells',
+        'height_cells',
+        'x_mm_from_panel_left',
+        'y_mm_from_panel_top',
+        'artwork_width_mm',
+        'artwork_height_mm',
+        'file',
+      ]]
+
+      for (const booking of approvedBookings) {
+        const isFace = booking.panel === 'front' || booking.panel === 'back'
+        const cols = isFace ? bag.front_cols : bag.side_cols
+        const rowsCount = isFace ? bag.front_rows : bag.side_rows
+        const panelWidthMm = isFace ? bag.front_width_mm : bag.side_gusset_mm
+        const gridWidthMm = cols * 30 + Math.max(0, cols - 1) * 3
+        const gridHeightMm = rowsCount * 30 + Math.max(0, rowsCount - 1) * 3
+        const offsetX = Math.max(10, (panelWidthMm - gridWidthMm) / 2)
+        const offsetY = Math.max(10, (bag.height_mm - gridHeightMm) / 2)
+        const xMm = offsetX + booking.left_col * 33
+        const yMm = offsetY + booking.top_row * 33
+        const artworkWidthMm = booking.width_cells * 30 + Math.max(0, booking.width_cells - 1) * 3
+        const artworkHeightMm = booking.height_cells * 30 + Math.max(0, booking.height_cells - 1) * 3
+
+        const path = booking.artwork_path!
+        const extension = path.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'
+        const filename = `${booking.panel}_r${booking.top_row + 1}_c${booking.left_col + 1}_${booking.id.slice(0, 8)}.${extension}`
+
+        const { data: signed, error: signedError } = await supabase.storage
+          .from('ad-artwork')
+          .createSignedUrl(path, 600)
+
+        if (signedError || !signed?.signedUrl) {
+          throw new Error(`Could not access artwork ${booking.id.slice(0, 8).toUpperCase()}.`)
+        }
+
+        const response = await fetch(signed.signedUrl)
+        if (!response.ok) {
+          throw new Error(`Could not download artwork ${booking.id.slice(0, 8).toUpperCase()}.`)
+        }
+
+        zip.file(`artwork/${filename}`, await response.arrayBuffer())
+
+        const profile = firstRelation(booking.profiles)
+        rows.push([
+          booking.id.slice(0, 8).toUpperCase(),
+          profile?.display_name ?? 'Advertiser',
+          booking.panel,
+          String(booking.top_row + 1),
+          String(booking.left_col + 1),
+          String(booking.width_cells),
+          String(booking.height_cells),
+          xMm.toFixed(1),
+          yMm.toFixed(1),
+          artworkWidthMm.toFixed(1),
+          artworkHeightMm.toFixed(1),
+          filename,
+        ])
+      }
+
+      const csv = rows
+        .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+        .join('\n')
+
+      zip.file('manifest.csv', '\uFEFF' + csv)
+      zip.file(
+        'README.txt',
+        [
+          `FreePack production artwork pack — ${bag.name} / ${run.run_code}`,
+          '',
+          `Approved artwork files: ${approvedBookings.length}`,
+          `Panel size: front/back ${bag.front_width_mm} × ${bag.height_mm} mm; sides ${bag.side_gusset_mm} × ${bag.height_mm} mm`,
+          '',
+          'PLACEMENT RULES',
+          '- Coordinates in manifest.csv are measured from the top-left of the named bag panel.',
+          '- Base advertising unit: 30 × 30 mm.',
+          '- Grid pitch: 33 mm (30 mm unit + 3 mm separation between neighbouring advertiser positions).',
+          '- A multi-cell advert is one continuous rectangle; internal 3 mm gaps are not printed inside the advertiser artwork.',
+          '- Current layout keeps at least a 10 mm safe margin from panel edges.',
+          '',
+          'IMPORTANT',
+          'This pack is a production placement pack, not the final manufacturer dieline.',
+          'The bag manufacturer dieline, folds, glue areas, bleed and press requirements override these coordinates before final print artwork is released.',
+        ].join('\n'),
+      )
+
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `FreePack-${run.run_code}-artwork-pack.zip`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+      setAdminMessage(`Production pack exported with ${approvedBookings.length} approved artwork file${approvedBookings.length === 1 ? '' : 's'}.`)
+    } catch (error) {
+      setAdminMessage(error instanceof Error ? error.message : 'Could not build the production artwork pack.')
+    } finally {
+      setAdminExportingRun(null)
+    }
   }
 
   async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
@@ -2166,9 +2343,19 @@ export default function App() {
                                 <option value="completed">Completed</option>
                               </select>
                             </label>
-                            <button className="button button-light" onClick={() => updateRunDetails(item)}>
-                              Update advertiser message
-                            </button>
+                            <div className="admin-campaign-actions">
+                              <button className="button button-light" onClick={() => updateRunDetails(item)}>
+                                Update advertiser message
+                              </button>
+                              <button
+                                className="button button-dark"
+                                disabled={adminExportingRun === item.id}
+                                onClick={() => void exportProductionPack(item)}
+                              >
+                                <Download size={14} />
+                                {adminExportingRun === item.id ? 'Building pack…' : 'Export artwork pack'}
+                              </button>
+                            </div>
                           </div>
 
                           {(item.status_note || item.estimated_stage_date) && (
