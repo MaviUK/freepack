@@ -110,6 +110,29 @@ type AccountBooking = {
   }[] | null
 }
 
+type PaymentSuccess = {
+  id: string
+  status: string
+  panel: PanelKey
+  width_cells: number
+  height_cells: number
+  square_count: number
+  total_pence: number
+  paid_at: string | null
+  artwork_review_status: string
+  production_runs: {
+    id: string
+    run_code: string
+    status: string
+    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
+  } | {
+    id: string
+    run_code: string
+    status: string
+    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
+  }[] | null
+}
+
 type AccountOrder = {
   id: string
   status: string
@@ -305,6 +328,9 @@ export default function App() {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [paymentBanner, setPaymentBanner] = useState('')
   const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null)
+  const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccess | null>(null)
+  const [paymentSuccessSales, setPaymentSuccessSales] = useState<{ sold: number; capacity: number } | null>(null)
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [accountLoading, setAccountLoading] = useState(false)
   const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
@@ -506,7 +532,23 @@ export default function App() {
 
       const { data, error } = await supabase
         .from('ad_bookings')
-        .select('id,status,total_pence')
+        .select(`
+          id,
+          status,
+          panel,
+          width_cells,
+          height_cells,
+          square_count,
+          total_pence,
+          paid_at,
+          artwork_review_status,
+          production_runs (
+            id,
+            run_code,
+            status,
+            bag_sizes (name, total_square_count)
+          )
+        `)
         .eq('stripe_checkout_session_id', sessionId)
         .maybeSingle()
 
@@ -518,7 +560,29 @@ export default function App() {
       }
 
       if (data?.status === 'paid') {
-        setPaymentBanner(`Payment confirmed — your advertising space is secured for £${(data.total_pence / 100).toFixed(2)}.`)
+        const confirmed = data as unknown as PaymentSuccess
+        setPaymentSuccess(confirmed)
+
+        const runRelation = firstRelation(confirmed.production_runs)
+        const bagRelation = firstRelation(runRelation?.bag_sizes)
+
+        if (runRelation?.id) {
+          const { data: cells } = await supabase
+            .from('ad_cells')
+            .select('status')
+            .eq('production_run_id', runRelation.id)
+
+          const sold = (cells ?? []).filter((cell) => cell.status === 'sold').length
+          setPaymentSuccessSales({
+            sold,
+            capacity: bagRelation?.total_square_count ?? (cells?.length ?? 0),
+          })
+        } else {
+          setPaymentSuccessSales(null)
+        }
+
+        setPaymentBanner('')
+        setPaymentSuccessOpen(true)
         window.history.replaceState({}, '', `${window.location.pathname}#advertise`)
         return
       }
@@ -1768,6 +1832,97 @@ export default function App() {
                 </section>
               </div>
             )}
+          </section>
+        </div>
+      )}
+
+      {paymentSuccessOpen && paymentSuccess && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPaymentSuccessOpen(false)}>
+          <section
+            className="checkout-modal payment-success-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Advertising payment confirmation"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setPaymentSuccessOpen(false)} aria-label="Close confirmation">
+              <X size={20} />
+            </button>
+
+            <div className="payment-success-check"><Check size={28} /></div>
+            <p className="kicker">PAYMENT CONFIRMED</p>
+            <h2>Your advertising space is secured.</h2>
+            <p className="checkout-intro">
+              Your booking is now in your FreePack account. You can follow the production run from advertiser recruitment through printing, shipping and distribution.
+            </p>
+
+            {(() => {
+              const runRelation = firstRelation(paymentSuccess.production_runs)
+              const bagRelation = firstRelation(runRelation?.bag_sizes)
+              const campaignStatus = RUN_PROGRESS.find((item) => item.key === runRelation?.status)?.label ?? 'Recruiting advertisers'
+              const soldPercent = paymentSuccessSales && paymentSuccessSales.capacity > 0
+                ? Math.round((paymentSuccessSales.sold / paymentSuccessSales.capacity) * 100)
+                : 0
+
+              return (
+                <>
+                  <div className="payment-receipt-grid">
+                    <div>
+                      <span>Booking reference</span>
+                      <strong>{paymentSuccess.id.slice(0, 8).toUpperCase()}</strong>
+                    </div>
+                    <div>
+                      <span>Bag run</span>
+                      <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'}</strong>
+                    </div>
+                    <div>
+                      <span>Your space</span>
+                      <strong>{paymentSuccess.height_cells} × {paymentSuccess.width_cells} · {paymentSuccess.panel}</strong>
+                    </div>
+                    <div>
+                      <span>Amount paid</span>
+                      <strong>£{(paymentSuccess.total_pence / 100).toFixed(2)}</strong>
+                    </div>
+                    <div>
+                      <span>Artwork</span>
+                      <strong>{paymentSuccess.artwork_review_status.replaceAll('_', ' ')}</strong>
+                    </div>
+                    <div>
+                      <span>Campaign stage</span>
+                      <strong>{campaignStatus}</strong>
+                    </div>
+                  </div>
+
+                  {paymentSuccessSales && (
+                    <div className="payment-campaign-progress">
+                      <div>
+                        <strong>Advertiser recruitment</strong>
+                        <span>{paymentSuccessSales.sold} of {paymentSuccessSales.capacity} spaces sold</span>
+                      </div>
+                      <strong>{soldPercent}%</strong>
+                      <div className="campaign-sales-bar">
+                        <i style={{ width: `${Math.min(100, soldPercent)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+
+            <div className="payment-success-actions">
+              <button
+                className="button button-dark"
+                onClick={() => {
+                  setPaymentSuccessOpen(false)
+                  setAccountOpen(true)
+                }}
+              >
+                View campaign progress
+              </button>
+              <button className="button button-light" onClick={() => setPaymentSuccessOpen(false)}>
+                Done
+              </button>
+            </div>
           </section>
         </div>
       )}
