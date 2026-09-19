@@ -1513,57 +1513,37 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!userId || !cancelledPaymentReturn || runsLoading) return
+    const currentUserId = userId
+    const requestedBookingId = cancelledBookingId
+
+    if (!currentUserId || !cancelledPaymentReturn || runsLoading) return
 
     let cancelled = false
 
     async function restoreCancelledCheckout() {
       const fields = 'id,status,production_run_id,panel,top_row,left_col,width_cells,height_cells,total_pence,artwork_path,reserved_until'
 
-      let booking: {
-        id: string
-        status: string
-        production_run_id: string
-        panel: PanelKey
-        top_row: number
-        left_col: number
-        width_cells: number
-        height_cells: number
-        total_pence: number
-        artwork_path: string | null
-        reserved_until: string | null
-      } | null = null
-      let loadError: { message: string } | null = null
-
-      if (cancelledBookingId) {
-        const result = await supabase
-          .from('ad_bookings')
-          .select(fields)
-          .eq('id', cancelledBookingId)
-          .eq('user_id', userId)
-          .maybeSingle()
-
-        booking = result.data as typeof booking
-        loadError = result.error
-      } else {
-        // Older Stripe sessions did not include the booking ID in the cancel URL.
-        // Fall back to the user's newest active reservation so cancellation still
-        // returns them to exactly what they were working on.
-        const result = await supabase
-          .from('ad_bookings')
-          .select(fields)
-          .eq('user_id', userId)
-          .eq('status', 'reserved')
-          .gt('reserved_until', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        booking = result.data as typeof booking
-        loadError = result.error
-      }
+      const result = requestedBookingId
+        ? await supabase
+            .from('ad_bookings')
+            .select(fields)
+            .eq('id', requestedBookingId)
+            .eq('user_id', currentUserId)
+            .maybeSingle()
+        : await supabase
+            .from('ad_bookings')
+            .select(fields)
+            .eq('user_id', currentUserId)
+            .eq('status', 'reserved')
+            .gt('reserved_until', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
       if (cancelled) return
+
+      const booking = result.data
+      const loadError = result.error
 
       if (loadError || !booking) {
         setPaymentBanner('We could not restore that reservation. Please choose your advertising space again.')
