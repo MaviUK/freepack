@@ -1520,20 +1520,20 @@ export default function App() {
 
     let cancelled = false
 
-    async function restoreCancelledCheckout() {
+    async function restoreCancelledCheckout(authenticatedUserId: string, requestedId: string | null) {
       const fields = 'id,status,production_run_id,panel,top_row,left_col,width_cells,height_cells,total_pence,artwork_path,reserved_until'
 
-      const result = requestedBookingId
+      const result = requestedId
         ? await supabase
             .from('ad_bookings')
             .select(fields)
-            .eq('id', requestedBookingId)
-            .eq('user_id', currentUserId)
+            .eq('id', requestedId)
+            .eq('user_id', authenticatedUserId)
             .maybeSingle()
         : await supabase
             .from('ad_bookings')
             .select(fields)
-            .eq('user_id', currentUserId)
+            .eq('user_id', authenticatedUserId)
             .eq('status', 'reserved')
             .gt('reserved_until', new Date().toISOString())
             .order('created_at', { ascending: false })
@@ -1614,7 +1614,7 @@ export default function App() {
       setCancelledPaymentReturn(false)
     }
 
-    void restoreCancelledCheckout()
+    void restoreCancelledCheckout(currentUserId, requestedBookingId)
 
     return () => {
       cancelled = true
