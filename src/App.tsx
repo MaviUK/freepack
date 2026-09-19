@@ -381,6 +381,7 @@ export default function App() {
   const [paymentBanner, setPaymentBanner] = useState('')
   const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null)
   const [cancelledBookingId, setCancelledBookingId] = useState<string | null>(null)
+  const [cancelledPaymentReturn, setCancelledPaymentReturn] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccess | null>(null)
   const [paymentSuccessSales, setPaymentSuccessSales] = useState<{ sold: number; capacity: number } | null>(null)
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false)
@@ -449,6 +450,7 @@ export default function App() {
     const resetType = params.get('reset_type')
     setPaymentSessionId(sessionId)
     setCancelledBookingId(payment === 'cancelled' ? bookingId : null)
+    setCancelledPaymentReturn(payment === 'cancelled')
 
     async function startPasswordReset() {
       if (!resetToken) return
@@ -1511,23 +1513,62 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!userId || !cancelledBookingId || runsLoading) return
+    if (!userId || !cancelledPaymentReturn || runsLoading) return
 
     let cancelled = false
 
     async function restoreCancelledCheckout() {
-      const { data: booking, error } = await supabase
-        .from('ad_bookings')
-        .select('id,status,production_run_id,panel,top_row,left_col,width_cells,height_cells,total_pence,artwork_path,reserved_until')
-        .eq('id', cancelledBookingId)
-        .eq('user_id', userId)
-        .maybeSingle()
+      const fields = 'id,status,production_run_id,panel,top_row,left_col,width_cells,height_cells,total_pence,artwork_path,reserved_until'
+
+      let booking: {
+        id: string
+        status: string
+        production_run_id: string
+        panel: PanelKey
+        top_row: number
+        left_col: number
+        width_cells: number
+        height_cells: number
+        total_pence: number
+        artwork_path: string | null
+        reserved_until: string | null
+      } | null = null
+      let loadError: { message: string } | null = null
+
+      if (cancelledBookingId) {
+        const result = await supabase
+          .from('ad_bookings')
+          .select(fields)
+          .eq('id', cancelledBookingId)
+          .eq('user_id', userId)
+          .maybeSingle()
+
+        booking = result.data as typeof booking
+        loadError = result.error
+      } else {
+        // Older Stripe sessions did not include the booking ID in the cancel URL.
+        // Fall back to the user's newest active reservation so cancellation still
+        // returns them to exactly what they were working on.
+        const result = await supabase
+          .from('ad_bookings')
+          .select(fields)
+          .eq('user_id', userId)
+          .eq('status', 'reserved')
+          .gt('reserved_until', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        booking = result.data as typeof booking
+        loadError = result.error
+      }
 
       if (cancelled) return
 
-      if (error || !booking) {
+      if (loadError || !booking) {
         setPaymentBanner('We could not restore that reservation. Please choose your advertising space again.')
         setCancelledBookingId(null)
+        setCancelledPaymentReturn(false)
         return
       }
 
@@ -1538,6 +1579,7 @@ export default function App() {
       ) {
         setPaymentBanner('That reservation has expired and the advertising space is available to select again.')
         setCancelledBookingId(null)
+        setCancelledPaymentReturn(false)
         return
       }
 
@@ -1589,6 +1631,7 @@ export default function App() {
       cleanUrl.searchParams.delete('booking_id')
       window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash)
       setCancelledBookingId(null)
+      setCancelledPaymentReturn(false)
     }
 
     void restoreCancelledCheckout()
@@ -1596,7 +1639,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [cancelledBookingId, runs, runsLoading, userId])
+  }, [cancelledBookingId, cancelledPaymentReturn, runs, runsLoading, userId])
 
   useEffect(() => {
     if (!run?.dbId) {
