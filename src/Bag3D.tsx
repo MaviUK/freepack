@@ -650,8 +650,6 @@ export default function Bag3D({
           const height = heightSponsorMm * pxPerMmY
 
           ctx.save()
-          ctx.fillStyle = '#ffffff'
-          ctx.fillRect(x, y, width, height)
           drawContainedImage(
             ctx,
             sponsorImage,
@@ -679,10 +677,10 @@ export default function Bag3D({
 
           // One advertiser gets one continuous rectangle: no internal 3mm gaps.
           ctx.save()
-          ctx.fillStyle = artworkImage && artworkImage.complete
-            ? '#ffffff'
-            : 'rgba(113,145,102,0.82)'
-          ctx.fillRect(x, y, width, height)
+          if (!artworkImage || !artworkImage.complete) {
+            ctx.fillStyle = 'rgba(113,145,102,0.82)'
+            ctx.fillRect(x, y, width, height)
+          }
 
           if (artworkImage && artworkImage.complete && artworkImage.naturalWidth && artworkImage.naturalHeight) {
             drawContainedImage(
