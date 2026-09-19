@@ -226,7 +226,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 150,
     sideWidth: 65,
     height: 300,
-    totalBagSquares: 80,
+    totalBagSquares: 60,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
@@ -242,7 +242,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 175,
     sideWidth: 113,
     height: 350,
-    totalBagSquares: 120,
+    totalBagSquares: 96,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -258,7 +258,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 200,
     sideWidth: 115,
     height: 375,
-    totalBagSquares: 140,
+    totalBagSquares: 112,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -274,7 +274,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 138,
     height: 413,
-    totalBagSquares: 240,
+    totalBagSquares: 200,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -332,6 +332,33 @@ function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
     back: { label: 'Back', shortLabel: 'Back', cols: face.cols, rows: face.rows, widthMm: run.faceWidth },
     left: { label: 'Left side', shortLabel: 'Left', cols: side.cols, rows: side.rows, widthMm: run.sideWidth },
   }
+}
+
+const BRAND_ROWS_BY_SIZE: Record<BagRun['size'], number[]> = {
+  Small: [3, 4],
+  Medium: [4, 5],
+  // L-001 already has paid artwork ending on row 4, so the permanent
+  // Freepack band sits immediately below centre rather than covering it.
+  Large: [5, 6],
+  XL: [5, 6],
+}
+
+function brandRowsForRun(run: BagRun) {
+  return BRAND_ROWS_BY_SIZE[run.size]
+}
+
+function brandRowsByPanelForRun(run: BagRun): Record<PanelKey, number[]> {
+  const rows = brandRowsForRun(run)
+  return {
+    front: rows,
+    right: rows,
+    back: rows,
+    left: rows,
+  }
+}
+
+function cellRow(key: string) {
+  return Number(key.split('-', 1)[0])
 }
 
 const RUN_PROGRESS = [
@@ -426,17 +453,28 @@ export default function App() {
 
   const run = runs.find((item) => item.id === runId) ?? runs[0] ?? BAG_RUNS[2]
   const panels = useMemo(() => panelsForRun(run), [run])
+  const brandRowsByPanel = useMemo(() => brandRowsByPanelForRun(run), [run])
   const panel = panels[panelKey]
+  const panelBrandRows = brandRowsByPanel[panelKey]
   const soldCells = useMemo(() => new Set(run.soldByPanel[panelKey]), [run, panelKey])
 
   const panelSquares = panel.cols * panel.rows
-  const panelSold = run.soldByPanel[panelKey].length
-  const panelAvailable = panelSquares - panelSold
-  const panelAvailability = Math.round((panelAvailable / panelSquares) * 100)
+  const panelBrandSquares = panelBrandRows.length * panel.cols
+  const panelSellableSquares = panelSquares - panelBrandSquares
+  const panelSold = run.soldByPanel[panelKey].filter((key) => !panelBrandRows.includes(cellRow(key))).length
+  const panelAvailable = panelSellableSquares - panelSold
+  const panelAvailability = panelSellableSquares > 0
+    ? Math.round((panelAvailable / panelSellableSquares) * 100)
+    : 0
 
-  const totalSold = PANEL_ORDER.reduce((sum, key) => sum + run.soldByPanel[key].length, 0)
+  const totalSold = PANEL_ORDER.reduce(
+    (sum, key) => sum + run.soldByPanel[key].filter((cell) => !brandRowsByPanel[key].includes(cellRow(cell))).length,
+    0,
+  )
   const totalAvailable = run.totalBagSquares - totalSold
-  const totalAvailability = Math.round((totalAvailable / run.totalBagSquares) * 100)
+  const totalAvailability = run.totalBagSquares > 0
+    ? Math.round((totalAvailable / run.totalBagSquares) * 100)
+    : 0
   const squarePricePence = run.pricePerSquarePence ?? DEMO_SQUARE_PRICE * 100
 
   useEffect(() => {
@@ -1737,7 +1775,14 @@ export default function App() {
 
   function chooseGridCell(targetPanel: PanelKey, point: Point) {
     const targetSoldCells = new Set(run.soldByPanel[targetPanel])
+    const targetBrandRows = brandRowsByPanel[targetPanel]
     const key = `${point.row}-${point.col}`
+
+    if (targetBrandRows.includes(point.row)) {
+      setPlacementMessage('That middle strip is reserved for Freepack branding.')
+      return
+    }
+
     if (targetSoldCells.has(key)) return
 
     const changingPanel = targetPanel !== panelKey
@@ -1799,9 +1844,15 @@ export default function App() {
 
     const currentCells = new Set(rectCells(selection))
     const addedCells = rectCells(next).filter((cellKey) => !currentCells.has(cellKey))
-    const blocked = addedCells.some((cellKey) => targetSoldCells.has(cellKey))
+    const blockedBySale = addedCells.some((cellKey) => targetSoldCells.has(cellKey))
+    const blockedByBrand = addedCells.some((cellKey) => targetBrandRows.includes(cellRow(cellKey)))
 
-    if (blocked) {
+    if (blockedByBrand) {
+      setPlacementMessage('That row or column reaches the Freepack branding strip.')
+      return
+    }
+
+    if (blockedBySale) {
       setPlacementMessage('That row or column includes space that is already taken.')
       return
     }
@@ -2419,8 +2470,9 @@ export default function App() {
                 <div className="surface-tabs" aria-label="Choose bag face">
                   {PANEL_ORDER.map((key) => {
                     const face = panels[key]
-                    const sold = run.soldByPanel[key].length
-                    const available = face.cols * face.rows - sold
+                    const branded = brandRowsByPanel[key].length * face.cols
+                    const sold = run.soldByPanel[key].filter((cell) => !brandRowsByPanel[key].includes(cellRow(cell))).length
+                    const available = face.cols * face.rows - branded - sold
                     return (
                       <button
                         key={key}
@@ -2443,6 +2495,8 @@ export default function App() {
                   panels={panels}
                   soldByPanel={run.soldByPanel}
                   sponsorArtwork={sponsorArtwork}
+                  brandRowsByPanel={brandRowsByPanel}
+                  brandLogoUrl="/freepack-logo-white.svg"
                   activePanel={panelKey}
                   selection={selection}
                   artwork={artwork}
