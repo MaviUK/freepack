@@ -676,11 +676,10 @@ export default function Bag3D({
           const height = heightSelectedMm * pxPerMmY
 
           // One advertiser gets one continuous rectangle: no internal 3mm gaps.
+          // Never paint a background behind advertiser artwork. Transparent
+          // pixels must reveal the kraft bag underneath; the border alone
+          // indicates the selected advertising area.
           ctx.save()
-          if (!artworkImage || !artworkImage.complete) {
-            ctx.fillStyle = 'rgba(113,145,102,0.82)'
-            ctx.fillRect(x, y, width, height)
-          }
 
           if (artworkImage && artworkImage.complete && artworkImage.naturalWidth && artworkImage.naturalHeight) {
             drawContainedImage(
