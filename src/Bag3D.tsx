@@ -662,8 +662,6 @@ export default function Bag3D({
           const bandWidth = layout.gridWidthMm * pxPerMmX
 
           ctx.save()
-          ctx.fillStyle = '#0E2A47'
-          ctx.fillRect(bandX, bandY, bandWidth, bandHeight)
 
           if (brandImage?.complete && brandImage.naturalWidth && brandImage.naturalHeight) {
             drawContainedImage(
@@ -675,12 +673,6 @@ export default function Bag3D({
               bandHeight,
               Math.max(8, Math.min(bandWidth, bandHeight) * 0.14),
             )
-          } else {
-            ctx.fillStyle = '#ffffff'
-            ctx.font = `900 ${Math.max(12, bandHeight * 0.24)}px system-ui, sans-serif`
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText('FREEPACK', bandX + bandWidth / 2, bandY + bandHeight / 2)
           }
 
           ctx.restore()
