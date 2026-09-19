@@ -29,6 +29,8 @@ type Bag3DProps = {
   panels: Record<BagPanelKey, BagPanelConfig>
   soldByPanel: Record<BagPanelKey, string[]>
   sponsorArtwork: BagSponsorArtwork[]
+  brandRowsByPanel: Record<BagPanelKey, number[]>
+  brandLogoUrl: string
   activePanel: BagPanelKey
   selection: BagRect | null
   artwork: string | null
@@ -92,6 +94,8 @@ export default function Bag3D({
   panels,
   soldByPanel,
   sponsorArtwork,
+  brandRowsByPanel,
+  brandLogoUrl,
   activePanel,
   selection,
   artwork,
@@ -133,6 +137,11 @@ export default function Bag3D({
       .map((item) => `${item.id}:${item.panel}:${item.topRow}:${item.leftCol}:${item.widthCells}:${item.heightCells}:${item.artworkUrl}`)
       .join('|'),
     [sponsorArtwork],
+  )
+
+  const brandSignature = useMemo(
+    () => PANEL_ORDER.map((key) => `${key}:${brandRowsByPanel[key].join(',')}`).join('|'),
+    [brandRowsByPanel],
   )
 
   useEffect(() => {
@@ -547,6 +556,7 @@ export default function Bag3D({
 
     let cancelled = false
     let artworkImage: HTMLImageElement | null = null
+    let brandImage: HTMLImageElement | null = null
     const sponsorImages = new Map<string, HTMLImageElement>()
 
     function drawContainedImage(
@@ -611,6 +621,9 @@ export default function Bag3D({
           for (let col = 0; col < cols; col += 1) {
             const x = originX + col * stepX
             const y = originY + row * stepY
+            const branded = brandRowsByPanel[panel].includes(row)
+            if (branded) continue
+
             const sold = soldByPanel[panel].includes(cellKey(row, col))
 
             ctx.fillStyle = sold
@@ -634,6 +647,43 @@ export default function Bag3D({
               ctx.fillText('SOLD', x + cellW / 2, y + cellH / 2)
             }
           }
+        }
+
+        const brandRows = brandRowsByPanel[panel]
+        if (brandRows.length) {
+          const firstBrandRow = Math.min(...brandRows)
+          const lastBrandRow = Math.max(...brandRows)
+          const bandY = originY + firstBrandRow * stepY
+          const bandHeightMm =
+            (lastBrandRow - firstBrandRow + 1) * CELL_MM +
+            Math.max(0, lastBrandRow - firstBrandRow) * GAP_MM
+          const bandHeight = bandHeightMm * pxPerMmY
+          const bandX = originX
+          const bandWidth = layout.gridWidthMm * pxPerMmX
+
+          ctx.save()
+          ctx.fillStyle = '#0E2A47'
+          ctx.fillRect(bandX, bandY, bandWidth, bandHeight)
+
+          if (brandImage?.complete && brandImage.naturalWidth && brandImage.naturalHeight) {
+            drawContainedImage(
+              ctx,
+              brandImage,
+              bandX,
+              bandY,
+              bandWidth,
+              bandHeight,
+              Math.max(8, Math.min(bandWidth, bandHeight) * 0.14),
+            )
+          } else {
+            ctx.fillStyle = '#ffffff'
+            ctx.font = `900 ${Math.max(12, bandHeight * 0.24)}px system-ui, sans-serif`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText('FREEPACK', bandX + bandWidth / 2, bandY + bandHeight / 2)
+          }
+
+          ctx.restore()
         }
 
         for (const sponsor of sponsorArtwork) {
@@ -716,6 +766,18 @@ export default function Bag3D({
       image.src = sponsor.artworkUrl
     }
 
+    if (brandLogoUrl) {
+      brandImage = new Image()
+      brandImage.crossOrigin = 'anonymous'
+      brandImage.onload = () => {
+        if (!cancelled) paint()
+      }
+      brandImage.onerror = () => {
+        if (!cancelled) paint()
+      }
+      brandImage.src = brandLogoUrl
+    }
+
     if (artwork) {
       artworkImage = new Image()
       artworkImage.crossOrigin = 'anonymous'
@@ -730,7 +792,7 @@ export default function Bag3D({
     return () => {
       cancelled = true
     }
-  }, [activePanel, artwork, panels, selection, soldByPanel, soldSignature, sponsorArtwork, sponsorSignature])
+  }, [activePanel, artwork, brandLogoUrl, brandRowsByPanel, brandSignature, panels, selection, soldByPanel, soldSignature, sponsorArtwork, sponsorSignature])
 
   function rotate(horizontal: number, vertical: number) {
     const bag = bagGroupRef.current
