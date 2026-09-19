@@ -242,7 +242,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 175,
     sideWidth: 113,
     height: 350,
-    totalBagSquares: 112,
+    totalBagSquares: 120,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -258,7 +258,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 200,
     sideWidth: 115,
     height: 375,
-    totalBagSquares: 130,
+    totalBagSquares: 140,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -274,7 +274,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 138,
     height: 413,
-    totalBagSquares: 226,
+    totalBagSquares: 240,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -335,13 +335,20 @@ function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
 }
 
 const BRAND_ROWS_BY_SIZE: Record<BagRun['size'], number[]> = {
-  // Small keeps a two-row clear zone; the other sizes use a tighter single-row
-  // clear zone so one extra advert row can sit closer to the centred logo.
+  // Small still needs a dedicated two-row logo clear zone.
+  // Medium, Large and XL now fit all advert rows by placing the centred
+  // Freepack logo in a compact gap between the upper and lower grids.
   Small: [3, 4],
-  Medium: [4],
-  // L-001 has paid artwork through row 4, so row 5 remains the protected logo row.
-  Large: [5],
-  XL: [5],
+  Medium: [],
+  Large: [],
+  XL: [],
+}
+
+const BRAND_GAP_AFTER_ROW_BY_SIZE: Record<BagRun['size'], number | null> = {
+  Small: null,
+  Medium: 4,
+  Large: 4,
+  XL: 5,
 }
 
 function brandRowsForRun(run: BagRun) {
@@ -355,6 +362,16 @@ function brandRowsByPanelForRun(run: BagRun): Record<PanelKey, number[]> {
     right: [],
     back: rows,
     left: [],
+  }
+}
+
+function brandGapAfterRowByPanelForRun(run: BagRun): Record<PanelKey, number | null> {
+  const gapAfterRow = BRAND_GAP_AFTER_ROW_BY_SIZE[run.size]
+  return {
+    front: gapAfterRow,
+    right: null,
+    back: gapAfterRow,
+    left: null,
   }
 }
 
@@ -455,6 +472,7 @@ export default function App() {
   const run = runs.find((item) => item.id === runId) ?? runs[0] ?? BAG_RUNS[2]
   const panels = useMemo(() => panelsForRun(run), [run])
   const brandRowsByPanel = useMemo(() => brandRowsByPanelForRun(run), [run])
+  const brandGapAfterRowByPanel = useMemo(() => brandGapAfterRowByPanelForRun(run), [run])
   const panel = panels[panelKey]
   const panelBrandRows = brandRowsByPanel[panelKey]
   const soldCells = useMemo(() => new Set(run.soldByPanel[panelKey]), [run, panelKey])
@@ -1777,6 +1795,7 @@ export default function App() {
   function chooseGridCell(targetPanel: PanelKey, point: Point) {
     const targetSoldCells = new Set(run.soldByPanel[targetPanel])
     const targetBrandRows = brandRowsByPanel[targetPanel]
+    const targetBrandGapAfterRow = brandGapAfterRowByPanel[targetPanel]
     const key = `${point.row}-${point.col}`
 
     if (targetBrandRows.includes(point.row)) {
@@ -1847,9 +1866,13 @@ export default function App() {
     const addedCells = rectCells(next).filter((cellKey) => !currentCells.has(cellKey))
     const blockedBySale = addedCells.some((cellKey) => targetSoldCells.has(cellKey))
     const blockedByBrand = addedCells.some((cellKey) => targetBrandRows.includes(cellRow(cellKey)))
+    const crossesBrandGap =
+      targetBrandGapAfterRow !== null &&
+      next.top <= targetBrandGapAfterRow &&
+      next.bottom > targetBrandGapAfterRow
 
-    if (blockedByBrand) {
-      setPlacementMessage('That row or column reaches the Freepack branding strip.')
+    if (blockedByBrand || crossesBrandGap) {
+      setPlacementMessage('That selection would cross the centred Freepack logo.')
       return
     }
 
@@ -2497,6 +2520,7 @@ export default function App() {
                   soldByPanel={run.soldByPanel}
                   sponsorArtwork={sponsorArtwork}
                   brandRowsByPanel={brandRowsByPanel}
+                  brandGapAfterRowByPanel={brandGapAfterRowByPanel}
                   brandLogoUrl="/freepack-logo-white.svg"
                   activePanel={panelKey}
                   selection={selection}
