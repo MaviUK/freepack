@@ -1575,8 +1575,14 @@ export default function App() {
       setReservationMessage('Your reserved space and artwork have been restored. You can continue to payment.')
       setPlacementMessage('Your reserved advertising space has been restored.')
       setCheckoutLoading(false)
-      setCheckoutOpen(true)
-      setPaymentBanner('Payment was cancelled. Your reservation is still held — continue whenever you are ready.')
+      setCheckoutOpen(false)
+      setPaymentBanner('Payment was cancelled. Your selection and artwork have been restored.')
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById('upload-artwork')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        })
+      })
 
       const cleanUrl = new URL(window.location.href)
       cleanUrl.searchParams.delete('payment')
@@ -2432,7 +2438,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="ad-flow-step ad-flow-artwork">
+            <div className="ad-flow-step ad-flow-artwork" id="upload-artwork">
               <div className="ad-step-heading">
                 <span className="ad-step-number">03</span>
                 <div>
