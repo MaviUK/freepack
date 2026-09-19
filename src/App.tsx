@@ -226,7 +226,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 150,
     sideWidth: 65,
     height: 300,
-    totalBagSquares: 64,
+    totalBagSquares: 80,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
@@ -340,17 +340,16 @@ function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
 }
 
 const BRAND_ROWS_BY_SIZE: Record<BagRun['size'], number[]> = {
-  // Small still needs a dedicated two-row logo clear zone.
-  // Medium, Large and XL now fit all advert rows by placing the centred
-  // Freepack logo in a compact gap between the upper and lower grids.
-  Small: [3, 4],
+  // All sizes now keep the centred Freepack logo in a compact gap between
+  // upper and lower advert rows instead of sacrificing sellable rows.
+  Small: [],
   Medium: [],
   Large: [],
   XL: [],
 }
 
 const BRAND_GAP_AFTER_ROW_BY_SIZE: Record<BagRun['size'], number | null> = {
-  Small: null,
+  Small: 3,
   Medium: 4,
   Large: 4,
   XL: 5,
