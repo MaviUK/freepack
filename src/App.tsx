@@ -964,6 +964,8 @@ export default function App() {
   }
 
   async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
+    setAdminMessage('')
+
     const { error } = await supabase
       .from('production_runs')
       .update({ status, updated_at: new Date().toISOString() })
@@ -977,6 +979,32 @@ export default function App() {
     setAdminRuns((current) => current.map((item) =>
       item.id === runDbId ? { ...item, status } : item,
     ))
+
+    const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-campaign-update', {
+      body: { run_id: runDbId },
+    })
+
+    if (notifyError || !notifyData?.ok) {
+      const context = (notifyError as { context?: Response } | null)?.context
+      let message = notifyData?.error || notifyError?.message || 'Campaign updated, but email notifications could not be sent.'
+
+      if (context) {
+        try {
+          const body = await context.clone().json() as { error?: string }
+          if (body?.error) message = body.error
+        } catch {
+          // Keep fallback message.
+        }
+      }
+
+      setAdminMessage(message)
+      return
+    }
+
+    const sent = Number(notifyData?.sent ?? 0)
+    setAdminMessage(sent > 0
+      ? `Campaign updated and ${sent} advertiser email${sent === 1 ? '' : 's'} sent.`
+      : 'Campaign updated. There are no paid advertisers to notify yet.')
   }
 
   async function updateRunDetails(run: AdminRun) {
