@@ -5,6 +5,16 @@ export type BagPanelKey = 'front' | 'right' | 'back' | 'left'
 export type BagPoint = { row: number; col: number }
 export type BagRect = { top: number; left: number; bottom: number; right: number }
 
+export type BagSponsorArtwork = {
+  id: string
+  panel: BagPanelKey
+  topRow: number
+  leftCol: number
+  widthCells: number
+  heightCells: number
+  artworkUrl: string
+}
+
 export type BagPanelConfig = {
   label: string
   cols: number
@@ -18,6 +28,7 @@ type Bag3DProps = {
   heightMm: number
   panels: Record<BagPanelKey, BagPanelConfig>
   soldByPanel: Record<BagPanelKey, string[]>
+  sponsorArtwork: BagSponsorArtwork[]
   activePanel: BagPanelKey
   selection: BagRect | null
   artwork: string | null
@@ -73,6 +84,7 @@ export default function Bag3D({
   heightMm,
   panels,
   soldByPanel,
+  sponsorArtwork,
   activePanel,
   selection,
   artwork,
@@ -106,6 +118,13 @@ export default function Bag3D({
   const soldSignature = useMemo(
     () => PANEL_ORDER.map((key) => `${key}:${soldByPanel[key].join(',')}`).join('|'),
     [soldByPanel],
+  )
+
+  const sponsorSignature = useMemo(
+    () => sponsorArtwork
+      .map((item) => `${item.id}:${item.panel}:${item.topRow}:${item.leftCol}:${item.widthCells}:${item.heightCells}:${item.artworkUrl}`)
+      .join('|'),
+    [sponsorArtwork],
   )
 
   useEffect(() => {
@@ -462,6 +481,33 @@ export default function Bag3D({
 
     let cancelled = false
     let artworkImage: HTMLImageElement | null = null
+    const sponsorImages = new Map<string, HTMLImageElement>()
+
+    function drawContainedImage(
+      ctx: CanvasRenderingContext2D,
+      image: HTMLImageElement,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      padding: number,
+    ) {
+      const availableWidth = Math.max(1, width - padding * 2)
+      const availableHeight = Math.max(1, height - padding * 2)
+      const scale = Math.min(
+        availableWidth / image.naturalWidth,
+        availableHeight / image.naturalHeight,
+      )
+      const drawW = image.naturalWidth * scale
+      const drawH = image.naturalHeight * scale
+      ctx.drawImage(
+        image,
+        x + (width - drawW) / 2,
+        y + (height - drawH) / 2,
+        drawW,
+        drawH,
+      )
+    }
 
     function paint() {
       PANEL_ORDER.forEach((panel) => {
@@ -524,6 +570,37 @@ export default function Bag3D({
           }
         }
 
+        for (const sponsor of sponsorArtwork) {
+          if (sponsor.panel !== panel) continue
+
+          const sponsorImage = sponsorImages.get(sponsor.id)
+          if (!sponsorImage?.complete || !sponsorImage.naturalWidth || !sponsorImage.naturalHeight) continue
+
+          const x = originX + sponsor.leftCol * stepX
+          const y = originY + sponsor.topRow * stepY
+          const widthMm = sponsor.widthCells * CELL_MM + Math.max(0, sponsor.widthCells - 1) * GAP_MM
+          const heightSponsorMm = sponsor.heightCells * CELL_MM + Math.max(0, sponsor.heightCells - 1) * GAP_MM
+          const width = widthMm * pxPerMmX
+          const height = heightSponsorMm * pxPerMmY
+
+          ctx.save()
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(x, y, width, height)
+          drawContainedImage(
+            ctx,
+            sponsorImage,
+            x,
+            y,
+            width,
+            height,
+            Math.max(3, Math.min(width, height) * 0.025),
+          )
+          ctx.strokeStyle = 'rgba(46,55,40,0.72)'
+          ctx.lineWidth = 2
+          ctx.strokeRect(x + 1, y + 1, width - 2, height - 2)
+          ctx.restore()
+        }
+
         if (panel === activePanel && selection) {
           const selectedCols = selection.right - selection.left + 1
           const selectedRows = selection.bottom - selection.top + 1
@@ -541,20 +618,15 @@ export default function Bag3D({
             : 'rgba(113,145,102,0.82)'
           ctx.fillRect(x, y, width, height)
 
-          if (artworkImage && artworkImage.complete) {
-            const padding = Math.max(5, Math.min(width, height) * 0.035)
-            const scale = Math.min(
-              (width - padding * 2) / artworkImage.naturalWidth,
-              (height - padding * 2) / artworkImage.naturalHeight,
-            )
-            const drawW = artworkImage.naturalWidth * scale
-            const drawH = artworkImage.naturalHeight * scale
-            ctx.drawImage(
+          if (artworkImage && artworkImage.complete && artworkImage.naturalWidth && artworkImage.naturalHeight) {
+            drawContainedImage(
+              ctx,
               artworkImage,
-              x + (width - drawW) / 2,
-              y + (height - drawH) / 2,
-              drawW,
-              drawH,
+              x,
+              y,
+              width,
+              height,
+              Math.max(5, Math.min(width, height) * 0.035),
             )
           }
 
@@ -568,8 +640,22 @@ export default function Bag3D({
       })
     }
 
+    for (const sponsor of sponsorArtwork) {
+      const image = new Image()
+      image.crossOrigin = 'anonymous'
+      image.onload = () => {
+        if (!cancelled) paint()
+      }
+      image.onerror = () => {
+        if (!cancelled) paint()
+      }
+      sponsorImages.set(sponsor.id, image)
+      image.src = sponsor.artworkUrl
+    }
+
     if (artwork) {
       artworkImage = new Image()
+      artworkImage.crossOrigin = 'anonymous'
       artworkImage.onload = () => {
         if (!cancelled) paint()
       }
@@ -581,7 +667,7 @@ export default function Bag3D({
     return () => {
       cancelled = true
     }
-  }, [activePanel, artwork, panels, selection, soldByPanel, soldSignature])
+  }, [activePanel, artwork, panels, selection, soldByPanel, soldSignature, sponsorArtwork, sponsorSignature])
 
   function rotate(horizontal: number, vertical: number) {
     const bag = bagGroupRef.current
