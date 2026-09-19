@@ -1273,6 +1273,25 @@ export default function App() {
   async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
     setAdminMessage('')
 
+    if (['sent_to_print', 'printing', 'shipping', 'in_stock', 'distributing', 'completed'].includes(status)) {
+      const paidBookings = adminBookings.filter((booking) =>
+        firstRelation(booking.production_runs)?.id === runDbId && booking.status === 'paid',
+      )
+      const unapproved = paidBookings.filter((booking) =>
+        booking.artwork_review_status !== 'approved' || !booking.artwork_path,
+      )
+
+      if (!paidBookings.length) {
+        setAdminMessage('This run cannot move to print until it has at least one paid advertiser.')
+        return
+      }
+
+      if (unapproved.length) {
+        setAdminMessage(`This run still has ${unapproved.length} paid artwork file${unapproved.length === 1 ? '' : 's'} waiting for approval.`)
+        return
+      }
+    }
+
     const { error } = await supabase
       .from('production_runs')
       .update({ status, updated_at: new Date().toISOString() })
@@ -2310,6 +2329,14 @@ export default function App() {
                       const capacity = bag?.total_square_count ?? 0
                       const soldPercent = capacity > 0 ? Math.round((sales.sold / capacity) * 100) : 0
                       const stage = RUN_PROGRESS.find((step) => step.key === item.status)?.label ?? item.status.replaceAll('_', ' ')
+                      const paidBookings = adminBookings.filter((booking) =>
+                        firstRelation(booking.production_runs)?.id === item.id && booking.status === 'paid',
+                      )
+                      const approvedArtwork = paidBookings.filter((booking) =>
+                        booking.artwork_review_status === 'approved' && Boolean(booking.artwork_path),
+                      )
+                      const artworkOutstanding = Math.max(0, paidBookings.length - approvedArtwork.length)
+                      const printReady = paidBookings.length > 0 && artworkOutstanding === 0
 
                       return (
                         <article className="admin-campaign-item" key={item.id}>
@@ -2328,6 +2355,18 @@ export default function App() {
                             </div>
                           </div>
 
+                          <div className={`print-readiness ${printReady ? 'ready' : 'blocked'}`}>
+                            <div>
+                              <strong>{printReady ? 'Ready for print' : 'Not ready for print'}</strong>
+                              <span>
+                                {paidBookings.length
+                                  ? `${approvedArtwork.length} of ${paidBookings.length} paid artwork file${paidBookings.length === 1 ? '' : 's'} approved`
+                                  : 'No paid advertiser artwork yet'}
+                              </span>
+                            </div>
+                            <span>{printReady ? <Check size={14} /> : artworkOutstanding || '—'}</span>
+                          </div>
+
                           <div className="admin-campaign-controls">
                             <label>
                               Campaign stage
@@ -2335,12 +2374,12 @@ export default function App() {
                                 <option value="selling">Recruiting advertisers</option>
                                 <option value="funded">Advertising sold</option>
                                 <option value="artwork_review">Artwork approval</option>
-                                <option value="sent_to_print">Sent for print</option>
-                                <option value="printing">Printing</option>
-                                <option value="shipping">Shipping</option>
-                                <option value="in_stock">In stock</option>
-                                <option value="distributing">Distribution</option>
-                                <option value="completed">Completed</option>
+                                <option value="sent_to_print" disabled={!printReady}>Sent for print</option>
+                                <option value="printing" disabled={!printReady}>Printing</option>
+                                <option value="shipping" disabled={!printReady}>Shipping</option>
+                                <option value="in_stock" disabled={!printReady}>In stock</option>
+                                <option value="distributing" disabled={!printReady}>Distribution</option>
+                                <option value="completed" disabled={!printReady}>Completed</option>
                               </select>
                             </label>
                             <div className="admin-campaign-actions">
@@ -2349,7 +2388,8 @@ export default function App() {
                               </button>
                               <button
                                 className="button button-dark"
-                                disabled={adminExportingRun === item.id}
+                                disabled={adminExportingRun === item.id || !printReady}
+                                title={printReady ? 'Download approved artwork and placement manifest' : 'Approve all paid advertiser artwork first'}
                                 onClick={() => void exportProductionPack(item)}
                               >
                                 <Download size={14} />
