@@ -3458,3 +3458,102 @@ canvas {
     line-height: 1.6;
   }
 }
+
+/* ===== COMPACT MOBILE RUN CARDS ===== */
+@media (max-width: 620px) {
+  .runs {
+    padding-top: 48px;
+  }
+
+  .runs-heading {
+    margin-bottom: 18px;
+  }
+
+  .run-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .run-option {
+    min-width: 0;
+    padding: 14px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .run-option-top {
+    margin-bottom: 6px;
+  }
+
+  .run-option-top span {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .run-option-top svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+  }
+
+  .run-option > strong {
+    font-size: 10px;
+    line-height: 1.35;
+    min-height: 27px;
+  }
+
+  .run-option-meta {
+    margin-top: 8px;
+    display: block;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .run-option-meta span:first-child {
+    display: none;
+  }
+
+  .availability-track {
+    height: 5px;
+    margin: 7px 0 9px;
+  }
+
+  .run-option small {
+    gap: 5px;
+    font-size: 9px;
+    line-height: 1.3;
+    white-space: normal;
+  }
+
+  .run-option small svg {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .run-options {
+    gap: 7px;
+  }
+
+  .run-option {
+    padding: 12px;
+  }
+
+  .run-option-top span {
+    font-size: 18px;
+  }
+
+  .run-option > strong,
+  .run-option-meta {
+    font-size: 9px;
+  }
+
+  .run-option small {
+    font-size: 8px;
+  }
+}
