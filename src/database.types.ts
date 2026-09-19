@@ -513,6 +513,41 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
+      replace_ad_booking_artwork: {
+        Args: { p_artwork_path: string; p_booking_id: string }
+        Returns: {
+          artwork_path: string | null
+          artwork_review_notes: string | null
+          artwork_review_status: Database["public"]["Enums"]["artwork_review_status"]
+          artwork_reviewed_at: string | null
+          artwork_reviewed_by: string | null
+          created_at: string
+          height_cells: number
+          id: string
+          left_col: number
+          paid_at: string | null
+          panel: Database["public"]["Enums"]["panel_type"]
+          payment_currency: string
+          price_per_square_pence: number
+          production_run_id: string
+          reserved_until: string | null
+          square_count: number
+          status: Database["public"]["Enums"]["booking_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          top_row: number
+          total_pence: number
+          updated_at: string
+          user_id: string
+          width_cells: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ad_bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reserve_ad_space: {
         Args: {
           p_height: number
