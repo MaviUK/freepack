@@ -598,7 +598,9 @@ export type Database = {
         | "selling"
         | "funded"
         | "artwork_review"
+        | "sent_to_print"
         | "printing"
+        | "shipping"
         | "in_stock"
         | "distributing"
         | "completed"
@@ -754,7 +756,9 @@ export const Constants = {
         "selling",
         "funded",
         "artwork_review",
+        "sent_to_print",
         "printing",
+        "shipping",
         "in_stock",
         "distributing",
         "completed",
