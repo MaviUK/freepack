@@ -144,7 +144,9 @@ export default function Bag3D({
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
-    camera.position.set(4.8, 2.8, 6.7)
+    // Keep the camera centred horizontally so whichever face is selected can
+    // rotate square-on to the viewer instead of remaining at a perspective angle.
+    camera.position.set(0, 2.8, 8.2)
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
 
