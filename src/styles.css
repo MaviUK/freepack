@@ -345,7 +345,7 @@ h1 em { color: #5f7156; font-family: Georgia, serif; font-weight: 500; }
   background-size:contain;
   background-repeat:no-repeat;
 }
-.artwork-overlay.has-artwork { background-color:#fff; }
+.artwork-overlay.has-artwork { background-color:transparent; }
 .artwork-overlay span {
   display:grid;
   place-items:center;
@@ -521,8 +521,10 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
 .checkout-art {
   aspect-ratio:1;
   border-radius:12px;
-  background:#fff center/contain no-repeat;
-  border:1px solid rgba(23,23,19,.08);
+  background-position:center;
+  background-size:contain;
+  background-repeat:no-repeat;
+  border:1px solid rgba(23,23,19,.16);
 }
 .checkout-preview > div:last-child { display:grid; gap:2px; }
 .checkout-preview span { font-size:10px; color:#7c796f; text-transform:uppercase; letter-spacing:.08em; margin-top:6px; }
@@ -3845,8 +3847,11 @@ canvas {
 .artwork-upload-preview {
   width: 96px;
   aspect-ratio: 1;
+  border: 1px solid rgba(14,42,71,.16);
+}
+
+.artwork-upload-placeholder {
   background: #eef1eb;
-  border: 1px solid rgba(14,42,71,.08);
 }
 
 .artwork-upload-placeholder {
