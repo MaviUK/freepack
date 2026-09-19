@@ -2276,139 +2276,157 @@ export default function App() {
             </div>
           </section>
 
-          <section className="campaign shell" id="advertise">
-            <div className="campaign-copy">
-              <p className="kicker">INTERACTIVE AD SELECTOR</p>
-              <h2>Choose the exact<br />space you want.</h2>
-              <p className="muted">
-                Build your advert directly on the bag. Start with 1 × 1, tap left or right to add a column,
-                then tap above or below to add a row. For example: 1 × 1 → 1 × 2 → 2 × 2 → 3 × 2.
-              </p>
+          <section className="ad-flow shell" id="advertise">
+            <div className="ad-flow-step ad-flow-space">
+              <div className="ad-step-heading">
+                <span className="ad-step-number">02</span>
+                <div>
+                  <p className="kicker">CHOOSE YOUR SPACE</p>
+                  <h2>Pick your position on the 3D bag.</h2>
+                  <p>Rotate the bag, choose a face and tap an available square. Tap beside your selection to make the advert larger.</p>
+                </div>
+              </div>
 
               {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
-              <div className="run-switcher" aria-label="Choose bag run">
-                {runs.map((item) => (
-                  <button
-                    key={item.id}
-                    className={runId === item.id ? 'active' : ''}
-                    onClick={() => changeRun(item.id)}
-                  >
-                    {item.size}
-                  </button>
-                ))}
+
+              <div className="ad-bag-toolbar">
+                <div className="ad-current-run">
+                  <span>Selected bag</span>
+                  <strong>{run.size}</strong>
+                  <small>{run.dimensions} · Run {run.id}</small>
+                </div>
+
+                <div className="surface-tabs" aria-label="Choose bag face">
+                  {PANEL_ORDER.map((key) => {
+                    const face = panels[key]
+                    const sold = run.soldByPanel[key].length
+                    const available = face.cols * face.rows - sold
+                    return (
+                      <button
+                        key={key}
+                        className={panelKey === key ? 'active' : ''}
+                        onClick={() => changePanel(key)}
+                      >
+                        <span>{face.shortLabel}</span>
+                        <small>{available} free</small>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
-              <div className="run-card">
-                <div>
-                  <span className="run-label">CURRENT RUN</span>
-                  <strong>{run.size} bag · Run {run.id}</strong>
-                  <small>{run.dimensions}</small>
-                </div>
-                <span className="run-status"><i /> Selling</span>
-              </div>
-
-              <div className="surface-tabs" aria-label="Choose bag face">
-                {PANEL_ORDER.map((key) => {
-                  const face = panels[key]
-                  const sold = run.soldByPanel[key].length
-                  const available = face.cols * face.rows - sold
-                  return (
-                    <button
-                      key={key}
-                      className={panelKey === key ? 'active' : ''}
-                      onClick={() => changePanel(key)}
-                    >
-                      <span>{face.shortLabel}</span>
-                      <small>{available} free</small>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="run-facts">
-                <span><strong>{panelAvailability}%</strong> {panel.label.toLowerCase()} available</span>
-                <span><strong>{totalAvailability}%</strong> whole bag available</span>
-                <span><strong>{run.estimatedStart}</strong> estimated start</span>
-              </div>
-
-              <div className="quote-card">
-                <div className="quote-row">
-                  <span>Bag face</span>
-                  <strong>{panel.label}</strong>
-                </div>
-                <div className="quote-row">
-                  <span>Selected shape</span>
-                  <strong>{shapeLabel(selection)}</strong>
-                </div>
-                <div className="quote-row">
-                  <span>3 cm squares</span>
-                  <strong>{selectedCount}</strong>
-                </div>
-                <div className="quote-row">
-                  <span>Price / square</span>
-                  <strong>£{(squarePricePence / 100).toFixed(2)}</strong>
-                </div>
-                <div className="quote-total">
-                  <span>Total</span>
-                  <strong>£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                </div>
-                <small>The same square price applies across every bag face on this production run.</small>
-              </div>
-
-              <div className="selector-actions">
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  hidden
-                  onChange={(event) => uploadArtwork(event.target.files?.[0])}
+              <div className="bag-wrap bag-wrap-true3d ad-flow-bag">
+                <Bag3D
+                  widthMm={run.faceWidth}
+                  depthMm={run.sideWidth}
+                  heightMm={run.height}
+                  panels={panels}
+                  soldByPanel={run.soldByPanel}
+                  sponsorArtwork={sponsorArtwork}
+                  activePanel={panelKey}
+                  selection={selection}
+                  artwork={artwork}
+                  onPanelChange={(key) => setPanelKey(key)}
+                  onCellSelect={chooseGridCell}
                 />
+
+                {placementMessage && (
+                  <div className="selection-warning">{placementMessage}</div>
+                )}
+                <p className="bag-help">
+                  {selection
+                    ? `Selected: ${shapeLabel(selection)} on ${panel.label}. Tap a free square beside the selected edge to grow it.`
+                    : 'Rotate the bag and tap any available grid square to start with 1 × 1.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="ad-flow-step ad-flow-artwork">
+              <div className="ad-step-heading">
+                <span className="ad-step-number">03</span>
+                <div>
+                  <p className="kicker">LOAD YOUR ARTWORK</p>
+                  <h2>Add your advert.</h2>
+                  <p>{selection ? `You have selected ${shapeLabel(selection)} on the ${panel.label.toLowerCase()}.` : 'Choose your space on the 3D bag first.'}</p>
+                </div>
+              </div>
+
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                hidden
+                onChange={(event) => uploadArtwork(event.target.files?.[0])}
+              />
+
+              <div className={`artwork-upload-card ${artwork ? 'has-artwork' : ''}`}>
+                {artwork ? (
+                  <div className="artwork-upload-preview" style={{ backgroundImage: `url("${artwork}")` }} />
+                ) : (
+                  <div className="artwork-upload-placeholder"><ImagePlus size={28} /></div>
+                )}
+                <div className="artwork-upload-copy">
+                  <strong>{artwork ? 'Artwork loaded' : 'Upload your artwork'}</strong>
+                  <span>PNG, JPG, WEBP or SVG</span>
+                </div>
                 <button
                   className="button upload-button"
                   disabled={!selection}
                   onClick={() => fileInput.current?.click()}
                 >
-                  <ImagePlus size={18} />
-                  {artwork ? 'Change artwork' : 'Upload artwork'}
-                </button>
-                <button className="reset-button" onClick={clearSelection} disabled={!selection && !preview}>
-                  <RotateCcw size={16} /> Reset
+                  <ImagePlus size={17} />
+                  {artwork ? 'Change artwork' : 'Choose file'}
                 </button>
               </div>
-
-              <button
-                className="button checkout-button"
-                disabled={!selection || !artwork}
-                onClick={() => setCheckoutOpen(true)}
-              >
-                Review & continue <ArrowRight size={17} />
-              </button>
-              {!artwork && selection && <p className="checkout-hint">Upload artwork to continue.</p>}
             </div>
 
-            <div className="bag-wrap bag-wrap-true3d">
-              <Bag3D
-                widthMm={run.faceWidth}
-                depthMm={run.sideWidth}
-                heightMm={run.height}
-                panels={panels}
-                soldByPanel={run.soldByPanel}
-                sponsorArtwork={sponsorArtwork}
-                activePanel={panelKey}
-                selection={selection}
-                artwork={artwork}
-                onPanelChange={(key) => setPanelKey(key)}
-                onCellSelect={chooseGridCell}
-              />
+            <div className="ad-flow-step ad-flow-review">
+              <div className="ad-step-heading">
+                <span className="ad-step-number">04</span>
+                <div>
+                  <p className="kicker">REVIEW THE DETAILS</p>
+                  <h2>Check everything before checkout.</h2>
+                </div>
+              </div>
 
-              {placementMessage && (
-                <div className="selection-warning">{placementMessage}</div>
-              )}
-              <p className="bag-help">
-                {selection
-                  ? `Selected: ${shapeLabel(selection)} on ${panel.label}. Rotate the bag and tap a free square beside the selected edge to grow it.`
-                  : 'Rotate the bag freely, then tap any available grid square to start with 1 × 1.'}
-              </p>
+              <div className="ad-review-grid">
+                <div className="ad-review-info">
+                  <div><span>Bag</span><strong>{run.size}</strong></div>
+                  <div><span>Run</span><strong>{run.id}</strong></div>
+                  <div><span>Bag face</span><strong>{panel.label}</strong></div>
+                  <div><span>Selected shape</span><strong>{shapeLabel(selection)}</strong></div>
+                  <div><span>3 cm squares</span><strong>{selectedCount}</strong></div>
+                  <div><span>Estimated start</span><strong>{run.estimatedStart}</strong></div>
+                </div>
+
+                <div className="ad-review-price">
+                  <span>Price per square</span>
+                  <strong>£{(squarePricePence / 100).toFixed(2)}</strong>
+                  <span>Total</span>
+                  <strong className="ad-review-total">£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                  <small>The same square price applies across every bag face on this production run.</small>
+                </div>
+              </div>
+
+              <div className="ad-review-status">
+                <span><strong>{panelAvailability}%</strong> {panel.label.toLowerCase()} available</span>
+                <span><strong>{totalAvailability}%</strong> whole bag available</span>
+              </div>
+
+              <div className="ad-review-actions">
+                <button className="reset-button" onClick={clearSelection} disabled={!selection && !preview}>
+                  <RotateCcw size={16} /> Reset selection
+                </button>
+                <button
+                  className="button checkout-button"
+                  disabled={!selection || !artwork}
+                  onClick={() => setCheckoutOpen(true)}
+                >
+                  Review & continue <ArrowRight size={17} />
+                </button>
+              </div>
+              {!selection && <p className="checkout-hint">Choose your advertising space on the 3D bag to continue.</p>}
+              {selection && !artwork && <p className="checkout-hint">Upload your artwork to continue.</p>}
             </div>
           </section>
         </>
