@@ -258,7 +258,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 200,
     sideWidth: 115,
     height: 375,
-    totalBagSquares: 140,
+    totalBagSquares: 160,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -323,7 +323,11 @@ function gridCount(widthMm: number, heightMm: number) {
 }
 
 function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
-  const face = gridCount(run.faceWidth, run.height)
+  const defaultFace = gridCount(run.faceWidth, run.height)
+  const face = run.size === 'Medium'
+    ? { cols: 5, rows: 10 }
+    : defaultFace
+
   const defaultSide = gridCount(run.sideWidth, run.height)
   const side = run.size === 'Medium'
     ? { cols: 3, rows: 10 }
