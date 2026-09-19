@@ -386,6 +386,7 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [accountLoading, setAccountLoading] = useState(false)
   const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
+  const [accountArtworkUrls, setAccountArtworkUrls] = useState<Record<string, string>>({})
   const [accountRunSales, setAccountRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
   const [replacementUploading, setReplacementUploading] = useState<string | null>(null)
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
@@ -582,7 +583,7 @@ export default function App() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'production_runs' },
-        (payload) => {
+        async (payload) => {
           const row = payload.new as {
             id?: string
             status?: string
@@ -673,6 +674,19 @@ export default function App() {
                 }
               : booking,
           ))
+
+          if (row.artwork_path) {
+            const { data } = await supabase.storage
+              .from('ad-artwork')
+              .createSignedUrl(row.artwork_path, 300)
+
+            if (data?.signedUrl) {
+              setAccountArtworkUrls((current) => ({
+                ...current,
+                [row.id!]: data.signedUrl,
+              }))
+            }
+          }
         },
       )
       .subscribe()
@@ -773,6 +787,7 @@ export default function App() {
     async function loadAccountData() {
       setAccountLoading(true)
       setAccountError('')
+      setAccountArtworkUrls({})
 
       const [bookingsResult, ordersResult] = await Promise.all([
         supabase
@@ -828,6 +843,21 @@ export default function App() {
         const bookings = (bookingsResult.data ?? []) as AccountBooking[]
         setAccountBookings(bookings)
         setAccountOrders((ordersResult.data ?? []) as AccountOrder[])
+
+        const artworkEntries = await Promise.all(
+          bookings
+            .filter((booking) => booking.artwork_path)
+            .map(async (booking) => {
+              const { data } = await supabase.storage
+                .from('ad-artwork')
+                .createSignedUrl(booking.artwork_path!, 300)
+              return [booking.id, data?.signedUrl ?? ''] as const
+            }),
+        )
+
+        if (!cancelled) {
+          setAccountArtworkUrls(Object.fromEntries(artworkEntries.filter(([, url]) => url)))
+        }
 
         const runIds = Array.from(new Set(
           bookings
@@ -2655,6 +2685,14 @@ export default function App() {
                               )}
                               {booking.artwork_review_status === 'pending' && booking.artwork_path && (
                                 <small>Your latest artwork is waiting for FreePack review.</small>
+                              )}
+                              {booking.artwork_review_status === 'approved' && accountArtworkUrls[booking.id] && (
+                                <div className="account-artwork-preview">
+                                  <img
+                                    src={accountArtworkUrls[booking.id]}
+                                    alt={`Approved artwork for ${bagRelation?.name ?? 'bag'} ${runRelation?.run_code ?? 'run'}`}
+                                  />
+                                </div>
                               )}
                               {booking.artwork_review_status === 'approved' && (
                                 <small>Approved for this production run.</small>
