@@ -78,6 +78,13 @@ function selectionContains(selection: BagRect | null, row: number, col: number) 
   )
 }
 
+function panelRotationY(panel: BagPanelKey) {
+  if (panel === 'right') return -Math.PI / 2
+  if (panel === 'back') return Math.PI
+  if (panel === 'left') return Math.PI / 2
+  return 0
+}
+
 export default function Bag3D({
   widthMm,
   depthMm,
@@ -98,6 +105,7 @@ export default function Bag3D({
   const bagGroupRef = useRef<THREE.Group | null>(null)
   const overlaysRef = useRef<Record<BagPanelKey, OverlayFace> | null>(null)
   const animationRef = useRef<number | null>(null)
+  const focusAnimationRef = useRef<number | null>(null)
   const onCellSelectRef = useRef(onCellSelect)
   const onPanelChangeRef = useRef(onPanelChange)
   const dragStateRef = useRef({
@@ -171,7 +179,7 @@ export default function Bag3D({
 
     const bagGroup = new THREE.Group()
     bagGroup.rotation.x = -0.12
-    bagGroup.rotation.y = -0.38
+    bagGroup.rotation.y = panelRotationY(activePanel)
     scene.add(bagGroup)
     bagGroupRef.current = bagGroup
 
@@ -367,6 +375,11 @@ export default function Bag3D({
     }
 
     function onPointerDown(event: PointerEvent) {
+      if (focusAnimationRef.current) {
+        cancelAnimationFrame(focusAnimationRef.current)
+        focusAnimationRef.current = null
+      }
+
       dragStateRef.current = {
         active: true,
         moved: false,
@@ -442,6 +455,10 @@ export default function Bag3D({
     return () => {
       resizeObserver.disconnect()
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      if (focusAnimationRef.current) {
+        cancelAnimationFrame(focusAnimationRef.current)
+        focusAnimationRef.current = null
+      }
 
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
       renderer.domElement.removeEventListener('pointermove', onPointerMove)
@@ -473,6 +490,53 @@ export default function Bag3D({
       overlaysRef.current = null
     }
   }, [widthMm, depthMm, heightMm, panels])
+
+  useEffect(() => {
+    const bag = bagGroupRef.current
+    if (!bag) return
+
+    if (focusAnimationRef.current) {
+      cancelAnimationFrame(focusAnimationRef.current)
+      focusAnimationRef.current = null
+    }
+
+    const startY = bag.rotation.y
+    let targetY = panelRotationY(activePanel)
+
+    while (targetY - startY > Math.PI) targetY -= Math.PI * 2
+    while (targetY - startY < -Math.PI) targetY += Math.PI * 2
+
+    const startX = bag.rotation.x
+    const targetX = -0.12
+    const duration = 360
+    const startedAt = performance.now()
+
+    function animate(now: number) {
+      const currentBag = bagGroupRef.current
+      if (!currentBag) return
+
+      const progress = Math.min(1, (now - startedAt) / duration)
+      const eased = 1 - Math.pow(1 - progress, 3)
+
+      currentBag.rotation.y = startY + (targetY - startY) * eased
+      currentBag.rotation.x = startX + (targetX - startX) * eased
+
+      if (progress < 1) {
+        focusAnimationRef.current = requestAnimationFrame(animate)
+      } else {
+        focusAnimationRef.current = null
+      }
+    }
+
+    focusAnimationRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (focusAnimationRef.current) {
+        cancelAnimationFrame(focusAnimationRef.current)
+        focusAnimationRef.current = null
+      }
+    }
+  }, [activePanel, widthMm, depthMm, heightMm])
 
   useEffect(() => {
     const overlays = overlaysRef.current
