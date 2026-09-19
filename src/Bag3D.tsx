@@ -30,6 +30,7 @@ type Bag3DProps = {
   soldByPanel: Record<BagPanelKey, string[]>
   sponsorArtwork: BagSponsorArtwork[]
   brandRowsByPanel: Record<BagPanelKey, number[]>
+  brandGapAfterRowByPanel: Record<BagPanelKey, number | null>
   brandLogoUrl: string
   activePanel: BagPanelKey
   selection: BagRect | null
@@ -53,12 +54,17 @@ const SAFE_MARGIN_MM = 10
 const VERTICAL_EDGE_MARGIN_MM = 6
 const BRAND_TO_AD_GAP_MM = 3
 
-function panelLayout(config: BagPanelConfig, heightMm: number, brandRows: number[] = []) {
+function panelLayout(
+  config: BagPanelConfig,
+  heightMm: number,
+  brandRows: number[] = [],
+  brandGapAfterRow: number | null = null,
+) {
   const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * GAP_MM
   const offsetXmm = Math.max(SAFE_MARGIN_MM, (config.widthMm - gridWidthMm) / 2)
   const rowYmm = Array.from({ length: config.rows }, () => 0)
 
-  if (!brandRows.length) {
+  if (!brandRows.length && brandGapAfterRow === null) {
     const gridHeightMm = config.rows * CELL_MM + Math.max(0, config.rows - 1) * GAP_MM
     const offsetYmm = Math.max(VERTICAL_EDGE_MARGIN_MM, (heightMm - gridHeightMm) / 2)
     for (let row = 0; row < config.rows; row += 1) {
@@ -78,17 +84,29 @@ function panelLayout(config: BagPanelConfig, heightMm: number, brandRows: number
   }
 
   const sortedBrandRows = [...brandRows].sort((a, b) => a - b)
-  const firstBrandRow = sortedBrandRows[0]
-  const lastBrandRow = sortedBrandRows[sortedBrandRows.length - 1]
   const brandZoneHeightMm = sortedBrandRows.length > 1 ? 48 : 22
   const brandZoneTopMm = (heightMm - brandZoneHeightMm) / 2
   const brandZoneBottomMm = brandZoneTopMm + brandZoneHeightMm
 
-  const topRows = Array.from({ length: firstBrandRow }, (_, index) => index)
-  const bottomRows = Array.from(
-    { length: config.rows - lastBrandRow - 1 },
-    (_, index) => lastBrandRow + 1 + index,
-  )
+  let topRows: number[]
+  let bottomRows: number[]
+
+  if (sortedBrandRows.length) {
+    const firstBrandRow = sortedBrandRows[0]
+    const lastBrandRow = sortedBrandRows[sortedBrandRows.length - 1]
+    topRows = Array.from({ length: firstBrandRow }, (_, index) => index)
+    bottomRows = Array.from(
+      { length: config.rows - lastBrandRow - 1 },
+      (_, index) => lastBrandRow + 1 + index,
+    )
+  } else {
+    const splitAfter = Math.max(0, Math.min(config.rows - 2, brandGapAfterRow ?? 0))
+    topRows = Array.from({ length: splitAfter + 1 }, (_, index) => index)
+    bottomRows = Array.from(
+      { length: config.rows - splitAfter - 1 },
+      (_, index) => splitAfter + 1 + index,
+    )
+  }
 
   function fitGap(rowCount: number, availableHeight: number) {
     if (rowCount <= 1) return 0
@@ -120,11 +138,13 @@ function panelLayout(config: BagPanelConfig, heightMm: number, brandRows: number
     })
   }
 
+  const visibleRows = rowYmm.filter((_, row) => !sortedBrandRows.includes(row))
+
   return {
     gridWidthMm,
     gridHeightMm: heightMm - VERTICAL_EDGE_MARGIN_MM * 2,
     offsetXmm,
-    offsetYmm: Math.min(...rowYmm.filter((_, row) => !sortedBrandRows.includes(row))),
+    offsetYmm: visibleRows.length ? Math.min(...visibleRows) : VERTICAL_EDGE_MARGIN_MM,
     stepMm: CELL_MM + GAP_MM,
     rowYmm,
     brandZoneTopMm,
@@ -161,6 +181,7 @@ export default function Bag3D({
   soldByPanel,
   sponsorArtwork,
   brandRowsByPanel,
+  brandGapAfterRowByPanel,
   brandLogoUrl,
   activePanel,
   selection,
@@ -206,8 +227,10 @@ export default function Bag3D({
   )
 
   const brandSignature = useMemo(
-    () => PANEL_ORDER.map((key) => `${key}:${brandRowsByPanel[key].join(',')}`).join('|'),
-    [brandRowsByPanel],
+    () => PANEL_ORDER
+      .map((key) => `${key}:${brandRowsByPanel[key].join(',')}:${brandGapAfterRowByPanel[key] ?? 'none'}`)
+      .join('|'),
+    [brandGapAfterRowByPanel, brandRowsByPanel],
   )
 
   useEffect(() => {
@@ -420,7 +443,8 @@ export default function Bag3D({
       const panel = hit.object.userData.panel as BagPanelKey
       const config = panels[panel]
       const panelBrandRows = brandRowsByPanel[panel]
-      const layout = panelLayout(config, heightMm, panelBrandRows)
+      const panelBrandGapAfterRow = brandGapAfterRowByPanel[panel]
+      const layout = panelLayout(config, heightMm, panelBrandRows, panelBrandGapAfterRow)
       const u = THREE.MathUtils.clamp(hit.uv.x, 0, 0.999999)
       const v = THREE.MathUtils.clamp(hit.uv.y, 0, 0.999999)
 
@@ -655,7 +679,8 @@ export default function Bag3D({
         const cols = config.cols
         const rows = config.rows
         const panelBrandRows = brandRowsByPanel[panel]
-        const layout = panelLayout(config, heightMm, panelBrandRows)
+        const panelBrandGapAfterRow = brandGapAfterRowByPanel[panel]
+        const layout = panelLayout(config, heightMm, panelBrandRows, panelBrandGapAfterRow)
         const pxPerMmX = canvas.width / config.widthMm
         const pxPerMmY = canvas.height / heightMm
         const cellW = CELL_MM * pxPerMmX
@@ -711,7 +736,8 @@ export default function Bag3D({
         }
 
         const brandRows = panelBrandRows
-        if (brandRows.length && layout.brandZoneTopMm !== null) {
+        const hasBrandZone = brandRows.length > 0 || panelBrandGapAfterRow !== null
+        if (hasBrandZone && layout.brandZoneTopMm !== null) {
           const bandY = layout.brandZoneTopMm * pxPerMmY
           const bandHeight = layout.brandZoneHeightMm * pxPerMmY
           const bandX = originX
@@ -842,7 +868,7 @@ export default function Bag3D({
     return () => {
       cancelled = true
     }
-  }, [activePanel, artwork, brandLogoUrl, brandRowsByPanel, brandSignature, panels, selection, soldByPanel, soldSignature, sponsorArtwork, sponsorSignature])
+  }, [activePanel, artwork, brandGapAfterRowByPanel, brandLogoUrl, brandRowsByPanel, brandSignature, panels, selection, soldByPanel, soldSignature, sponsorArtwork, sponsorSignature])
 
   function rotate(horizontal: number, vertical: number) {
     const bag = bagGroupRef.current
