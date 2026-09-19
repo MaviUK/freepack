@@ -1859,6 +1859,22 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   line-height:1.4;
   color:#817d74;
 }
+.account-artwork-preview {
+  width:100%;
+  border:1px solid rgba(23,23,19,.08);
+  border-radius:12px;
+  background:#fff;
+  overflow:hidden;
+  padding:10px;
+}
+.account-artwork-preview img {
+  display:block;
+  width:100%;
+  max-height:240px;
+  object-fit:contain;
+  border-radius:8px;
+  background:#fff;
+}
 .artwork-review-approved {
   background:#f2f7ef;
   border-color:rgba(80,102,72,.18);
