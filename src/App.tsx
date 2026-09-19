@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import JSZip from 'jszip'
-import Bag3D from './Bag3D'
+import Bag3D, { type BagSponsorArtwork } from './Bag3D'
 import { supabase } from './supabase'
 
 const DEMO_SQUARE_PRICE = 192
@@ -355,6 +355,8 @@ export default function App() {
   const [runs, setRuns] = useState<BagRun[]>(BAG_RUNS)
   const [runsLoading, setRunsLoading] = useState(true)
   const [runId, setRunId] = useState('L-001')
+  const [sponsorArtwork, setSponsorArtwork] = useState<BagSponsorArtwork[]>([])
+  const [sponsorArtworkRefresh, setSponsorArtworkRefresh] = useState(0)
   const [panelKey, setPanelKey] = useState<PanelKey>('front')
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [preview, setPreview] = useState<Rect | null>(null)
@@ -563,6 +565,8 @@ export default function App() {
               },
             }
           }))
+
+          setSponsorArtworkRefresh((current) => current + 1)
         },
       )
       .subscribe()
@@ -1473,6 +1477,55 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!run?.dbId) {
+      setSponsorArtwork([])
+      return
+    }
+
+    let cancelled = false
+
+    async function loadSponsorArtwork() {
+      const { data, error } = await supabase.functions.invoke('get-run-sponsor-artwork', {
+        body: { run_id: run.dbId },
+      })
+
+      if (cancelled) return
+
+      if (error || !data?.ok) {
+        console.error('Could not load approved sponsor artwork', error ?? data?.error)
+        setSponsorArtwork([])
+        return
+      }
+
+      const mapped = ((data.sponsors ?? []) as Array<{
+        id: string
+        panel: PanelKey
+        top_row: number
+        left_col: number
+        width_cells: number
+        height_cells: number
+        artwork_url: string
+      }>).map((item) => ({
+        id: item.id,
+        panel: item.panel,
+        topRow: item.top_row,
+        leftCol: item.left_col,
+        widthCells: item.width_cells,
+        heightCells: item.height_cells,
+        artworkUrl: item.artwork_url,
+      }))
+
+      setSponsorArtwork(mapped)
+    }
+
+    void loadSponsorArtwork()
+
+    return () => {
+      cancelled = true
+    }
+  }, [run?.dbId, sponsorArtworkRefresh])
+
   const previewBlocked = useMemo(
     () => Boolean(preview && rectCells(preview).some((key) => soldCells.has(key))),
     [preview, soldCells],
@@ -2197,6 +2250,7 @@ export default function App() {
             heightMm={run.height}
             panels={panels}
             soldByPanel={run.soldByPanel}
+            sponsorArtwork={sponsorArtwork}
             activePanel={panelKey}
             selection={selection}
             artwork={artwork}
