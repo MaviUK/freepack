@@ -290,9 +290,10 @@ export default function App() {
   const [artwork, setArtwork] = useState<string | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin')
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [authMessage, setAuthMessage] = useState('')
   const [authReturnTo, setAuthReturnTo] = useState<'advertiser' | 'takeaway' | null>(null)
@@ -360,7 +361,36 @@ export default function App() {
     const sessionId = params.get('session_id')
     const confirmToken = params.get('confirm_token')
     const confirmType = params.get('confirm_type')
+    const resetToken = params.get('reset_token')
+    const resetType = params.get('reset_type')
     setPaymentSessionId(sessionId)
+
+    async function startPasswordReset() {
+      if (!resetToken) return
+
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: resetToken,
+        type: (resetType || 'recovery') as 'recovery',
+      })
+
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.searchParams.delete('reset_token')
+      cleanUrl.searchParams.delete('reset_type')
+      window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash)
+
+      if (error) {
+        setPaymentBanner('That password reset link is invalid or has expired.')
+        return
+      }
+
+      setAuthPassword('')
+      setAuthConfirmPassword('')
+      setAuthMode('reset')
+      setAuthOpen(true)
+      setAuthMessage('Choose a new password for your FreePack account.')
+    }
+
+    void startPasswordReset()
 
     async function confirmEmailFromProductionLink() {
       if (!confirmToken) return
@@ -1025,6 +1055,62 @@ export default function App() {
     }
 
     setAuthReturnTo(null)
+  }
+
+  async function requestPasswordReset(event: React.FormEvent) {
+    event.preventDefault()
+    setAuthLoading(true)
+    setAuthMessage('')
+
+    const { data, error } = await supabase.functions.invoke('request-password-reset', {
+      body: { email: authEmail },
+    })
+
+    let message = data?.message || data?.error || error?.message || 'Could not send reset email.'
+    const context = (error as { context?: Response } | null)?.context
+    if (context) {
+      try {
+        const body = await context.clone().json() as { error?: string; message?: string }
+        message = body.message || body.error || message
+      } catch {
+        // Keep fallback message.
+      }
+    }
+
+    setAuthMessage(message)
+    setAuthLoading(false)
+  }
+
+  async function submitNewPassword(event: React.FormEvent) {
+    event.preventDefault()
+
+    if (authPassword.length < 8) {
+      setAuthMessage('Password must be at least 8 characters.')
+      return
+    }
+
+    if (authPassword !== authConfirmPassword) {
+      setAuthMessage('Passwords do not match.')
+      return
+    }
+
+    setAuthLoading(true)
+    setAuthMessage('')
+
+    const { error } = await supabase.auth.updateUser({ password: authPassword })
+
+    if (error) {
+      setAuthMessage(error.message)
+    } else {
+      setAuthMessage('Password updated. You are now signed in.')
+      window.setTimeout(() => {
+        setAuthOpen(false)
+        setAuthMode('signin')
+        setAuthMessage('')
+      }, 900)
+    }
+
+    setAuthLoading(false)
   }
 
   async function handleAuth(event: React.FormEvent) {
@@ -1948,7 +2034,15 @@ export default function App() {
             className="checkout-modal auth-modal"
             role="dialog"
             aria-modal="true"
-            aria-label={authMode === 'signin' ? 'Sign in' : 'Create account'}
+            aria-label={
+              authMode === 'signin'
+                ? 'Sign in'
+                : authMode === 'signup'
+                  ? 'Create account'
+                  : authMode === 'forgot'
+                    ? 'Reset password'
+                    : 'Choose new password'
+            }
             onMouseDown={(event) => event.stopPropagation()}
           >
             <button className="modal-close" onClick={() => { setAuthOpen(false); setAuthReturnTo(null) }} aria-label="Close">
@@ -1956,48 +2050,138 @@ export default function App() {
             </button>
             <div className="checkout-icon"><UserRound size={22} /></div>
             <p className="kicker">FREEPACK ACCOUNT</p>
-            <h2>{authMode === 'signin' ? 'Sign in' : 'Create your account'}</h2>
+            <h2>
+              {authMode === 'signin'
+                ? 'Sign in'
+                : authMode === 'signup'
+                  ? 'Create your account'
+                  : authMode === 'forgot'
+                    ? 'Reset your password'
+                    : 'Choose a new password'}
+            </h2>
             <p className="checkout-intro">
-              Use one account for advertising bookings or free takeaway bag orders.
+              {authMode === 'forgot'
+                ? 'Enter your email and we’ll send a secure reset link from FreePack.'
+                : authMode === 'reset'
+                  ? 'Enter a new password for your account.'
+                  : 'Use one account for advertising bookings or free takeaway bag orders.'}
             </p>
 
-            <form className="auth-form" onSubmit={handleAuth}>
-              <label>
-                Email
-                <input
-                  type="email"
-                  required
-                  value={authEmail}
-                  onChange={(event) => setAuthEmail(event.target.value)}
-                  placeholder="you@company.co.uk"
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  placeholder="At least 8 characters"
-                />
-              </label>
-              {authMessage && <div className="auth-message">{authMessage}</div>}
-              <button className="button button-dark modal-primary" disabled={authLoading}>
-                {authLoading ? 'Please wait…' : authMode === 'signin' ? 'Sign in' : 'Create account'}
-              </button>
-            </form>
+            {authMode === 'forgot' ? (
+              <form className="auth-form" onSubmit={requestPasswordReset}>
+                <label>
+                  Email
+                  <input
+                    type="email"
+                    required
+                    value={authEmail}
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                    placeholder="you@company.co.uk"
+                  />
+                </label>
+                {authMessage && <div className="auth-message">{authMessage}</div>}
+                <button className="button button-dark modal-primary" disabled={authLoading}>
+                  {authLoading ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+            ) : authMode === 'reset' ? (
+              <form className="auth-form" onSubmit={submitNewPassword}>
+                <label>
+                  New password
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    placeholder="At least 8 characters"
+                  />
+                </label>
+                <label>
+                  Confirm new password
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={authConfirmPassword}
+                    onChange={(event) => setAuthConfirmPassword(event.target.value)}
+                    placeholder="Repeat your password"
+                  />
+                </label>
+                {authMessage && <div className="auth-message">{authMessage}</div>}
+                <button className="button button-dark modal-primary" disabled={authLoading}>
+                  {authLoading ? 'Updating…' : 'Update password'}
+                </button>
+              </form>
+            ) : (
+              <>
+                <form className="auth-form" onSubmit={handleAuth}>
+                  <label>
+                    Email
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(event) => setAuthEmail(event.target.value)}
+                      placeholder="you@company.co.uk"
+                    />
+                  </label>
+                  <label>
+                    Password
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      value={authPassword}
+                      onChange={(event) => setAuthPassword(event.target.value)}
+                      placeholder="At least 8 characters"
+                    />
+                  </label>
+                  {authMessage && <div className="auth-message">{authMessage}</div>}
+                  <button className="button button-dark modal-primary" disabled={authLoading}>
+                    {authLoading ? 'Please wait…' : authMode === 'signin' ? 'Sign in' : 'Create account'}
+                  </button>
+                </form>
 
-            <button
-              className="auth-switch"
-              onClick={() => {
-                setAuthMode(authMode === 'signin' ? 'signup' : 'signin')
-                setAuthMessage('')
-              }}
-            >
-              {authMode === 'signin' ? 'New to Freepack? Create an account' : 'Already have an account? Sign in'}
-            </button>
+                {authMode === 'signin' && (
+                  <button
+                    className="auth-switch auth-forgot"
+                    onClick={() => {
+                      setAuthMode('forgot')
+                      setAuthMessage('')
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </>
+            )}
+
+            {authMode !== 'reset' && (
+              <button
+                className="auth-switch"
+                onClick={() => {
+                  setAuthMode(authMode === 'signin' || authMode === 'forgot' ? 'signup' : 'signin')
+                  setAuthMessage('')
+                }}
+              >
+                {authMode === 'signin' || authMode === 'forgot'
+                  ? 'New to Freepack? Create an account'
+                  : 'Already have an account? Sign in'}
+              </button>
+            )}
+
+            {authMode === 'forgot' && (
+              <button
+                className="auth-switch"
+                onClick={() => {
+                  setAuthMode('signin')
+                  setAuthMessage('')
+                }}
+              >
+                Back to sign in
+              </button>
+            )}
           </section>
         </div>
       )}
