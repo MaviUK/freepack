@@ -1634,3 +1634,80 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   }
   .run-step span { font-size:9px; }
 }
+
+
+.payment-success-modal { width:min(620px,100%); }
+.payment-success-check {
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#dfe9d9;
+  color:#46613f;
+  margin-bottom:14px;
+}
+.payment-receipt-grid {
+  margin-top:18px;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.payment-receipt-grid > div {
+  border:1px solid rgba(23,23,19,.09);
+  border-radius:14px;
+  background:#f7f4ec;
+  padding:13px;
+  display:grid;
+  gap:4px;
+}
+.payment-receipt-grid span {
+  color:#8a867e;
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-weight:800;
+}
+.payment-receipt-grid strong {
+  font-size:12px;
+  text-transform:capitalize;
+}
+.payment-campaign-progress {
+  margin-top:16px;
+  border:1px solid rgba(23,23,19,.09);
+  border-radius:16px;
+  background:#fff;
+  padding:14px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:6px 14px;
+  align-items:end;
+}
+.payment-campaign-progress > div:first-child {
+  display:grid;
+  gap:3px;
+}
+.payment-campaign-progress > div:first-child strong { font-size:11px; }
+.payment-campaign-progress > div:first-child span {
+  color:#858279;
+  font-size:9px;
+}
+.payment-campaign-progress > strong {
+  color:#4f6647;
+  font-size:15px;
+}
+.payment-campaign-progress .campaign-sales-bar {
+  grid-column:1 / -1;
+  margin-top:1px;
+}
+.payment-success-actions {
+  margin-top:20px;
+  display:flex;
+  gap:9px;
+}
+.payment-success-actions .button { flex:1; justify-content:center; }
+
+@media (max-width:520px) {
+  .payment-receipt-grid { grid-template-columns:1fr; }
+  .payment-success-actions { display:grid; }
+}
