@@ -50,19 +50,85 @@ const PANEL_ORDER: BagPanelKey[] = ['front', 'right', 'back', 'left']
 const CELL_MM = 30
 const GAP_MM = 3
 const SAFE_MARGIN_MM = 10
+const VERTICAL_EDGE_MARGIN_MM = 6
+const BRAND_TO_AD_GAP_MM = 3
 
-function panelLayout(config: BagPanelConfig, heightMm: number) {
+function panelLayout(config: BagPanelConfig, heightMm: number, brandRows: number[] = []) {
   const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * GAP_MM
-  const gridHeightMm = config.rows * CELL_MM + Math.max(0, config.rows - 1) * GAP_MM
   const offsetXmm = Math.max(SAFE_MARGIN_MM, (config.widthMm - gridWidthMm) / 2)
-  const offsetYmm = Math.max(SAFE_MARGIN_MM, (heightMm - gridHeightMm) / 2)
+  const rowYmm = Array.from({ length: config.rows }, () => 0)
+
+  if (!brandRows.length) {
+    const gridHeightMm = config.rows * CELL_MM + Math.max(0, config.rows - 1) * GAP_MM
+    const offsetYmm = Math.max(VERTICAL_EDGE_MARGIN_MM, (heightMm - gridHeightMm) / 2)
+    for (let row = 0; row < config.rows; row += 1) {
+      rowYmm[row] = offsetYmm + row * (CELL_MM + GAP_MM)
+    }
+
+    return {
+      gridWidthMm,
+      gridHeightMm,
+      offsetXmm,
+      offsetYmm,
+      stepMm: CELL_MM + GAP_MM,
+      rowYmm,
+      brandZoneTopMm: null as number | null,
+      brandZoneHeightMm: 0,
+    }
+  }
+
+  const sortedBrandRows = [...brandRows].sort((a, b) => a - b)
+  const firstBrandRow = sortedBrandRows[0]
+  const lastBrandRow = sortedBrandRows[sortedBrandRows.length - 1]
+  const brandZoneHeightMm = sortedBrandRows.length > 1 ? 48 : 22
+  const brandZoneTopMm = (heightMm - brandZoneHeightMm) / 2
+  const brandZoneBottomMm = brandZoneTopMm + brandZoneHeightMm
+
+  const topRows = Array.from({ length: firstBrandRow }, (_, index) => index)
+  const bottomRows = Array.from(
+    { length: config.rows - lastBrandRow - 1 },
+    (_, index) => lastBrandRow + 1 + index,
+  )
+
+  function fitGap(rowCount: number, availableHeight: number) {
+    if (rowCount <= 1) return 0
+    return Math.min(
+      GAP_MM,
+      Math.max(0, (availableHeight - rowCount * CELL_MM) / (rowCount - 1)),
+    )
+  }
+
+  if (topRows.length) {
+    const topEndMm = brandZoneTopMm - BRAND_TO_AD_GAP_MM
+    const availableHeight = topEndMm - VERTICAL_EDGE_MARGIN_MM
+    const gap = fitGap(topRows.length, availableHeight)
+    const blockHeight = topRows.length * CELL_MM + (topRows.length - 1) * gap
+    const startMm = topEndMm - blockHeight
+
+    topRows.forEach((row, index) => {
+      rowYmm[row] = startMm + index * (CELL_MM + gap)
+    })
+  }
+
+  if (bottomRows.length) {
+    const bottomStartMm = brandZoneBottomMm + BRAND_TO_AD_GAP_MM
+    const availableHeight = heightMm - VERTICAL_EDGE_MARGIN_MM - bottomStartMm
+    const gap = fitGap(bottomRows.length, availableHeight)
+
+    bottomRows.forEach((row, index) => {
+      rowYmm[row] = bottomStartMm + index * (CELL_MM + gap)
+    })
+  }
 
   return {
     gridWidthMm,
-    gridHeightMm,
+    gridHeightMm: heightMm - VERTICAL_EDGE_MARGIN_MM * 2,
     offsetXmm,
-    offsetYmm,
+    offsetYmm: Math.min(...rowYmm.filter((_, row) => !sortedBrandRows.includes(row))),
     stepMm: CELL_MM + GAP_MM,
+    rowYmm,
+    brandZoneTopMm,
+    brandZoneHeightMm,
   }
 }
 
@@ -353,34 +419,30 @@ export default function Bag3D({
 
       const panel = hit.object.userData.panel as BagPanelKey
       const config = panels[panel]
-      const layout = panelLayout(config, heightMm)
+      const panelBrandRows = brandRowsByPanel[panel]
+      const layout = panelLayout(config, heightMm, panelBrandRows)
       const u = THREE.MathUtils.clamp(hit.uv.x, 0, 0.999999)
       const v = THREE.MathUtils.clamp(hit.uv.y, 0, 0.999999)
 
       const xMm = u * config.widthMm
       const yMm = (1 - v) * heightMm
       const localX = xMm - layout.offsetXmm
-      const localY = yMm - layout.offsetYmm
 
-      if (
-        localX < 0 ||
-        localY < 0 ||
-        localX > layout.gridWidthMm ||
-        localY > layout.gridHeightMm
-      ) {
-        return null
-      }
+      if (localX < 0 || localX > layout.gridWidthMm) return null
 
       const col = Math.floor(localX / layout.stepMm)
-      const row = Math.floor(localY / layout.stepMm)
-
-      if (col < 0 || col >= config.cols || row < 0 || row >= config.rows) return null
+      if (col < 0 || col >= config.cols) return null
 
       const withinCellX = localX - col * layout.stepMm
-      const withinCellY = localY - row * layout.stepMm
+      if (withinCellX > CELL_MM) return null
 
-      // The 3mm physical gap is intentionally not clickable.
-      if (withinCellX > CELL_MM || withinCellY > CELL_MM) return null
+      const row = layout.rowYmm.findIndex((rowY, rowIndex) => (
+        !panelBrandRows.includes(rowIndex) &&
+        yMm >= rowY &&
+        yMm <= rowY + CELL_MM
+      ))
+
+      if (row < 0) return null
 
       return { panel, point: { row, col } }
     }
@@ -500,7 +562,7 @@ export default function Bag3D({
       bagGroupRef.current = null
       overlaysRef.current = null
     }
-  }, [widthMm, depthMm, heightMm, panels])
+  }, [widthMm, depthMm, heightMm, panels, brandSignature])
 
   useEffect(() => {
     const bag = bagGroupRef.current
@@ -592,15 +654,14 @@ export default function Bag3D({
         const { canvas, ctx, texture } = overlay
         const cols = config.cols
         const rows = config.rows
-        const layout = panelLayout(config, heightMm)
+        const panelBrandRows = brandRowsByPanel[panel]
+        const layout = panelLayout(config, heightMm, panelBrandRows)
         const pxPerMmX = canvas.width / config.widthMm
         const pxPerMmY = canvas.height / heightMm
         const cellW = CELL_MM * pxPerMmX
         const cellH = CELL_MM * pxPerMmY
         const stepX = layout.stepMm * pxPerMmX
-        const stepY = layout.stepMm * pxPerMmY
         const originX = layout.offsetXmm * pxPerMmX
-        const originY = layout.offsetYmm * pxPerMmY
 
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -620,8 +681,8 @@ export default function Bag3D({
         for (let row = 0; row < rows; row += 1) {
           for (let col = 0; col < cols; col += 1) {
             const x = originX + col * stepX
-            const y = originY + row * stepY
-            const branded = brandRowsByPanel[panel].includes(row)
+            const y = layout.rowYmm[row] * pxPerMmY
+            const branded = panelBrandRows.includes(row)
             if (branded) continue
 
             const sold = soldByPanel[panel].includes(cellKey(row, col))
@@ -649,15 +710,10 @@ export default function Bag3D({
           }
         }
 
-        const brandRows = brandRowsByPanel[panel]
-        if (brandRows.length) {
-          const firstBrandRow = Math.min(...brandRows)
-          const lastBrandRow = Math.max(...brandRows)
-          const bandY = originY + firstBrandRow * stepY
-          const bandHeightMm =
-            (lastBrandRow - firstBrandRow + 1) * CELL_MM +
-            Math.max(0, lastBrandRow - firstBrandRow) * GAP_MM
-          const bandHeight = bandHeightMm * pxPerMmY
+        const brandRows = panelBrandRows
+        if (brandRows.length && layout.brandZoneTopMm !== null) {
+          const bandY = layout.brandZoneTopMm * pxPerMmY
+          const bandHeight = layout.brandZoneHeightMm * pxPerMmY
           const bandX = originX
           const bandWidth = layout.gridWidthMm * pxPerMmX
 
@@ -685,11 +741,13 @@ export default function Bag3D({
           if (!sponsorImage?.complete || !sponsorImage.naturalWidth || !sponsorImage.naturalHeight) continue
 
           const x = originX + sponsor.leftCol * stepX
-          const y = originY + sponsor.topRow * stepY
+          const sponsorBottomRow = sponsor.topRow + sponsor.heightCells - 1
+          const yMm = layout.rowYmm[sponsor.topRow]
+          const bottomMm = layout.rowYmm[sponsorBottomRow] + CELL_MM
+          const y = yMm * pxPerMmY
           const widthMm = sponsor.widthCells * CELL_MM + Math.max(0, sponsor.widthCells - 1) * GAP_MM
-          const heightSponsorMm = sponsor.heightCells * CELL_MM + Math.max(0, sponsor.heightCells - 1) * GAP_MM
           const width = widthMm * pxPerMmX
-          const height = heightSponsorMm * pxPerMmY
+          const height = (bottomMm - yMm) * pxPerMmY
 
           ctx.save()
           drawContainedImage(
@@ -709,13 +767,13 @@ export default function Bag3D({
 
         if (panel === activePanel && selection) {
           const selectedCols = selection.right - selection.left + 1
-          const selectedRows = selection.bottom - selection.top + 1
           const x = originX + selection.left * stepX
-          const y = originY + selection.top * stepY
+          const selectionTopMm = layout.rowYmm[selection.top]
+          const selectionBottomMm = layout.rowYmm[selection.bottom] + CELL_MM
+          const y = selectionTopMm * pxPerMmY
           const widthMm = selectedCols * CELL_MM + Math.max(0, selectedCols - 1) * GAP_MM
-          const heightSelectedMm = selectedRows * CELL_MM + Math.max(0, selectedRows - 1) * GAP_MM
           const width = widthMm * pxPerMmX
-          const height = heightSelectedMm * pxPerMmY
+          const height = (selectionBottomMm - selectionTopMm) * pxPerMmY
 
           // One advertiser gets one continuous rectangle: no internal 3mm gaps.
           // Never paint a background behind advertiser artwork. Transparent
@@ -832,7 +890,7 @@ export default function Bag3D({
       </button>
 
       <div className="bag3d-hint">
-        3cm units at physical scale · 3mm gaps · drag to rotate · tap a square to select
+        3cm advert units · tighter spacing around centred Freepack branding · drag to rotate · tap to select
       </div>
     </div>
   )
