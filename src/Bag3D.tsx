@@ -60,7 +60,17 @@ function panelLayout(
   brandRows: number[] = [],
   brandGapAfterRow: number | null = null,
 ) {
-  const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * GAP_MM
+  const horizontalGapMm = config.cols <= 1
+    ? 0
+    : Math.min(
+        GAP_MM,
+        Math.max(
+          0,
+          (config.widthMm - SAFE_MARGIN_MM * 2 - config.cols * CELL_MM) / (config.cols - 1),
+        ),
+      )
+  const stepXmm = CELL_MM + horizontalGapMm
+  const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * horizontalGapMm
   const offsetXmm = Math.max(SAFE_MARGIN_MM, (config.widthMm - gridWidthMm) / 2)
   const rowYmm = Array.from({ length: config.rows }, () => 0)
 
@@ -76,7 +86,8 @@ function panelLayout(
       gridHeightMm,
       offsetXmm,
       offsetYmm,
-      stepMm: CELL_MM + GAP_MM,
+      stepMm: stepXmm,
+      horizontalGapMm,
       rowYmm,
       brandZoneTopMm: null as number | null,
       brandZoneHeightMm: 0,
@@ -145,7 +156,8 @@ function panelLayout(
     gridHeightMm: heightMm - VERTICAL_EDGE_MARGIN_MM * 2,
     offsetXmm,
     offsetYmm: visibleRows.length ? Math.min(...visibleRows) : VERTICAL_EDGE_MARGIN_MM,
-    stepMm: CELL_MM + GAP_MM,
+    stepMm: stepXmm,
+      horizontalGapMm,
     rowYmm,
     brandZoneTopMm,
     brandZoneHeightMm,
@@ -771,7 +783,7 @@ export default function Bag3D({
           const yMm = layout.rowYmm[sponsor.topRow]
           const bottomMm = layout.rowYmm[sponsorBottomRow] + CELL_MM
           const y = yMm * pxPerMmY
-          const widthMm = sponsor.widthCells * CELL_MM + Math.max(0, sponsor.widthCells - 1) * GAP_MM
+          const widthMm = sponsor.widthCells * CELL_MM + Math.max(0, sponsor.widthCells - 1) * layout.horizontalGapMm
           const width = widthMm * pxPerMmX
           const height = (bottomMm - yMm) * pxPerMmY
 
@@ -797,7 +809,7 @@ export default function Bag3D({
           const selectionTopMm = layout.rowYmm[selection.top]
           const selectionBottomMm = layout.rowYmm[selection.bottom] + CELL_MM
           const y = selectionTopMm * pxPerMmY
-          const widthMm = selectedCols * CELL_MM + Math.max(0, selectedCols - 1) * GAP_MM
+          const widthMm = selectedCols * CELL_MM + Math.max(0, selectedCols - 1) * layout.horizontalGapMm
           const width = widthMm * pxPerMmX
           const height = (selectionBottomMm - selectionTopMm) * pxPerMmY
 
