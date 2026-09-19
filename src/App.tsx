@@ -52,11 +52,17 @@ type AdminBooking = {
     id: string
     run_code: string
     status: string
+    status_updated_at: string
+    status_note: string | null
+    estimated_stage_date: string | null
     bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   } | {
     id: string
     run_code: string
     status: string
+    status_updated_at: string
+    status_note: string | null
+    estimated_stage_date: string | null
     bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   }[] | null
 }
@@ -82,10 +88,13 @@ type AdminRun = {
   id: string
   run_code: string
   status: string
+  status_updated_at: string
+  status_note: string | null
+  estimated_stage_date: string | null
   estimated_start_date: string | null
   price_per_square_pence: number
   bag_quantity: number | null
-  bag_sizes: { name: string } | { name: string }[] | null
+  bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
 }
 
 type AccountBooking = {
@@ -101,11 +110,17 @@ type AccountBooking = {
     id: string
     run_code: string
     status: string
+    status_updated_at: string
+    status_note: string | null
+    estimated_stage_date: string | null
     bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   } | {
     id: string
     run_code: string
     status: string
+    status_updated_at: string
+    status_note: string | null
+    estimated_stage_date: string | null
     bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   }[] | null
 }
@@ -124,11 +139,17 @@ type PaymentSuccess = {
     id: string
     run_code: string
     status: string
+    status_updated_at: string
+    status_note: string | null
+    estimated_stage_date: string | null
     bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   } | {
     id: string
     run_code: string
     status: string
+    status_updated_at: string
+    status_note: string | null
+    estimated_stage_date: string | null
     bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   }[] | null
 }
@@ -344,6 +365,7 @@ export default function App() {
   const [adminBookings, setAdminBookings] = useState<AdminBooking[]>([])
   const [adminOrders, setAdminOrders] = useState<AdminOrder[]>([])
   const [adminRuns, setAdminRuns] = useState<AdminRun[]>([])
+  const [adminRunSales, setAdminRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
   const [adminArtworkUrls, setAdminArtworkUrls] = useState<Record<string, string>>({})
   const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
   const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
@@ -520,6 +542,75 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const channel = supabase
+      .channel('freepack-production-runs')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'production_runs' },
+        (payload) => {
+          const row = payload.new as {
+            id?: string
+            status?: string
+            status_updated_at?: string
+            status_note?: string | null
+            estimated_stage_date?: string | null
+          }
+
+          if (!row.id) return
+
+          setAccountBookings((current) => current.map((booking) => {
+            const relation = firstRelation(booking.production_runs)
+            if (!relation || relation.id !== row.id) return booking
+
+            const nextRelation = {
+              ...relation,
+              status: row.status ?? relation.status,
+              status_updated_at: row.status_updated_at ?? relation.status_updated_at,
+              status_note: row.status_note ?? null,
+              estimated_stage_date: row.estimated_stage_date ?? null,
+            }
+
+            return { ...booking, production_runs: nextRelation }
+          }))
+
+          setPaymentSuccess((current) => {
+            if (!current) return current
+            const relation = firstRelation(current.production_runs)
+            if (!relation || relation.id !== row.id) return current
+
+            return {
+              ...current,
+              production_runs: {
+                ...relation,
+                status: row.status ?? relation.status,
+                status_updated_at: row.status_updated_at ?? relation.status_updated_at,
+                status_note: row.status_note ?? null,
+                estimated_stage_date: row.estimated_stage_date ?? null,
+              },
+            }
+          })
+
+          setAdminRuns((current) => current.map((item) =>
+            item.id === row.id
+              ? {
+                  ...item,
+                  status: row.status ?? item.status,
+                  status_updated_at: row.status_updated_at ?? item.status_updated_at,
+                  status_note: row.status_note ?? null,
+                  estimated_stage_date: row.estimated_stage_date ?? null,
+                }
+              : item,
+          ))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!userId || !paymentSessionId) return
 
     const sessionId = paymentSessionId
@@ -627,6 +718,9 @@ export default function App() {
               id,
               run_code,
               status,
+              status_updated_at,
+              status_note,
+              estimated_stage_date,
               bag_sizes (name, total_square_count)
             )
           `)
@@ -721,8 +815,13 @@ export default function App() {
             created_at,
             profiles!ad_bookings_user_id_fkey (display_name),
             production_runs (
+              id,
               run_code,
-              bag_sizes (name)
+              status,
+              status_updated_at,
+              status_note,
+              estimated_stage_date,
+              bag_sizes (name, total_square_count)
             )
           `)
           .order('created_at', { ascending: false }),
@@ -742,10 +841,13 @@ export default function App() {
             id,
             run_code,
             status,
+            status_updated_at,
+            status_note,
+            estimated_stage_date,
             estimated_start_date,
             price_per_square_pence,
             bag_quantity,
-            bag_sizes (name)
+            bag_sizes (name, total_square_count)
           `)
           .order('run_code'),
       ])
@@ -766,7 +868,29 @@ export default function App() {
       const bookings = (bookingsResult.data ?? []) as AdminBooking[]
       setAdminBookings(bookings)
       setAdminOrders((ordersResult.data ?? []) as AdminOrder[])
-      setAdminRuns((runsResult.data ?? []) as AdminRun[])
+      const adminRunsData = (runsResult.data ?? []) as AdminRun[]
+      setAdminRuns(adminRunsData)
+
+      const adminRunIds = adminRunsData.map((item) => item.id)
+      if (adminRunIds.length) {
+        const { data: salesCells } = await supabase
+          .from('ad_cells')
+          .select('production_run_id,status')
+          .in('production_run_id', adminRunIds)
+
+        const metrics: Record<string, { sold: number; reserved: number }> = {}
+        for (const runId of adminRunIds) metrics[runId] = { sold: 0, reserved: 0 }
+
+        for (const cell of salesCells ?? []) {
+          if (!metrics[cell.production_run_id]) continue
+          if (cell.status === 'sold') metrics[cell.production_run_id].sold += 1
+          if (cell.status === 'reserved') metrics[cell.production_run_id].reserved += 1
+        }
+
+        setAdminRunSales(metrics)
+      } else {
+        setAdminRunSales({})
+      }
 
       const artworkEntries = await Promise.all(
         bookings
@@ -853,6 +977,45 @@ export default function App() {
     setAdminRuns((current) => current.map((item) =>
       item.id === runDbId ? { ...item, status } : item,
     ))
+  }
+
+  async function updateRunDetails(run: AdminRun) {
+    const nextNote = window.prompt(
+      'Status note shown to advertisers (leave blank for none):',
+      run.status_note ?? '',
+    )
+    if (nextNote === null) return
+
+    const nextDate = window.prompt(
+      'Estimated date for this stage (YYYY-MM-DD, leave blank for none):',
+      run.estimated_stage_date ?? '',
+    )
+    if (nextDate === null) return
+
+    const { error } = await supabase
+      .from('production_runs')
+      .update({
+        status_note: nextNote.trim() || null,
+        estimated_stage_date: nextDate.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', run.id)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminRuns((current) => current.map((item) =>
+      item.id === run.id
+        ? {
+            ...item,
+            status_note: nextNote.trim() || null,
+            estimated_stage_date: nextDate.trim() || null,
+          }
+        : item,
+    ))
+    setAdminMessage('Campaign details updated.')
   }
 
   useEffect(() => {
@@ -1808,23 +1971,54 @@ export default function App() {
                   <div className="admin-list compact">
                     {adminRuns.map((item) => {
                       const bag = firstRelation(item.bag_sizes)
+                      const sales = adminRunSales[item.id] ?? { sold: 0, reserved: 0 }
+                      const capacity = bag?.total_square_count ?? 0
+                      const soldPercent = capacity > 0 ? Math.round((sales.sold / capacity) * 100) : 0
+                      const stage = RUN_PROGRESS.find((step) => step.key === item.status)?.label ?? item.status.replaceAll('_', ' ')
+
                       return (
-                        <article className="admin-item order-admin-item" key={item.id}>
-                          <div className="admin-item-copy">
-                            <strong>{bag?.name ?? 'Bag'} · {item.run_code}</strong>
-                            <span>£{(item.price_per_square_pence / 100).toFixed(2)} / square</span>
+                        <article className="admin-campaign-item" key={item.id}>
+                          <div className="admin-campaign-head">
+                            <div className="admin-item-copy">
+                              <strong>{bag?.name ?? 'Bag'} · {item.run_code}</strong>
+                              <span>{stage} · £{(item.price_per_square_pence / 100).toFixed(2)} / square</span>
+                            </div>
+                            <strong>{capacity ? `${soldPercent}% sold` : '—'}</strong>
                           </div>
-                          <select value={item.status} onChange={(event) => updateRunStatus(item.id, event.target.value as any)}>
-                            <option value="selling">Selling advertising</option>
-                            <option value="funded">Funded / closed</option>
-                            <option value="artwork_review">Artwork approval</option>
-                            <option value="sent_to_print">Sent for print</option>
-                            <option value="printing">Printing</option>
-                            <option value="shipping">Shipping</option>
-                            <option value="in_stock">In stock</option>
-                            <option value="distributing">Distribution</option>
-                            <option value="completed">Completed</option>
-                          </select>
+
+                          <div className="admin-campaign-sales">
+                            <span>{sales.sold} sold · {sales.reserved} reserved · {capacity || '—'} total spaces</span>
+                            <div className="campaign-sales-bar">
+                              <i style={{ width: `${Math.min(100, soldPercent)}%` }} />
+                            </div>
+                          </div>
+
+                          <div className="admin-campaign-controls">
+                            <label>
+                              Campaign stage
+                              <select value={item.status} onChange={(event) => updateRunStatus(item.id, event.target.value as any)}>
+                                <option value="selling">Recruiting advertisers</option>
+                                <option value="funded">Advertising sold</option>
+                                <option value="artwork_review">Artwork approval</option>
+                                <option value="sent_to_print">Sent for print</option>
+                                <option value="printing">Printing</option>
+                                <option value="shipping">Shipping</option>
+                                <option value="in_stock">In stock</option>
+                                <option value="distributing">Distribution</option>
+                                <option value="completed">Completed</option>
+                              </select>
+                            </label>
+                            <button className="button button-light" onClick={() => updateRunDetails(item)}>
+                              Update advertiser message
+                            </button>
+                          </div>
+
+                          {(item.status_note || item.estimated_stage_date) && (
+                            <div className="admin-campaign-note">
+                              {item.status_note && <span>{item.status_note}</span>}
+                              {item.estimated_stage_date && <small>Estimated: {item.estimated_stage_date}</small>}
+                            </div>
+                          )}
                         </article>
                       )
                     })}
@@ -2006,6 +2200,16 @@ export default function App() {
                             <div className="campaign-sales-bar">
                               <i style={{ width: `${Math.min(100, soldPercent)}%` }} />
                             </div>
+
+                            {(runRelation?.status_note || runRelation?.estimated_stage_date) && (
+                              <div className="campaign-update">
+                                <strong>Latest update</strong>
+                                {runRelation.status_note && <span>{runRelation.status_note}</span>}
+                                {runRelation.estimated_stage_date && (
+                                  <small>Estimated date: {new Date(`${runRelation.estimated_stage_date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</small>
+                                )}
+                              </div>
+                            )}
 
                             <div className="run-timeline" aria-label="Production progress">
                               {RUN_PROGRESS.map((step, index) => {
