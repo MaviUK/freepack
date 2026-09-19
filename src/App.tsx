@@ -1985,6 +1985,14 @@ export default function App() {
     setReservationLoading(false)
   }
 
+  const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
+  const publicPage: 'home' | 'bags' | 'advertise' =
+    currentPath === '/bags'
+      ? 'bags'
+      : currentPath === '/advertise'
+        ? 'advertise'
+        : 'home'
+
   return (
     <main>
       {paymentBanner && (
@@ -1994,13 +2002,13 @@ export default function App() {
         </div>
       )}
       <header className="nav shell">
-        <a className="brand" href="#" aria-label="Freepack home">
+        <a className="brand" href="/" aria-label="Freepack home">
           <img src="/freepack-logo-white.svg" alt="Freepack" />
         </a>
         <nav>
-          <a href="#how">How it works</a>
-          <a href="#bags">Free bags</a>
-          <a href="#advertise">Advertise</a>
+          <a className={publicPage === 'home' ? 'active' : ''} href="/">Who we are</a>
+          <a className={publicPage === 'bags' ? 'active' : ''} href="/bags">Free bags</a>
+          <a className={publicPage === 'advertise' ? 'active' : ''} href="/advertise">Advertise</a>
         </nav>
         {userId ? (
           <div className="nav-actions">
@@ -2020,318 +2028,391 @@ export default function App() {
         )}
       </header>
 
-      <section className="hero shell">
-        <div className="hero-copy">
-          <img className="hero-wordmark" src="/freepack-logo-white.svg" alt="" aria-hidden="true" />
-          <div className="eyebrow">SMART PACKAGING · SHARED REACH</div>
-          <h1>Takeaway bags.<br /><em>Completely free.</em></h1>
-          <p>
-            Restaurants get quality paper bags at no cost. Brands fund each production
-            run by buying advertising space directly on the bags.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-gold" href="#takeaway-order">Get free bags <ArrowRight size={18} /></a>
-            <a className="button button-outline" href="#advertise">Buy ad space</a>
-          </div>
-        </div>
+      {publicPage === 'home' && (
+        <>
+          <section className="hero shell home-hero">
+            <div className="hero-copy">
+              <div className="eyebrow">PACKAGING A BRIGHTER TOMORROW</div>
+              <h1>Packaging that<br /><em>works harder.</em></h1>
+              <p>
+                Freepack connects takeaways that need packaging with brands that want to be seen.
+                Advertising funds the production, so food businesses get quality paper bags for free.
+              </p>
+              <div className="hero-actions">
+                <a className="button button-gold" href="/bags">I need free bags <ArrowRight size={18} /></a>
+                <a className="button button-outline" href="/advertise">I want to advertise</a>
+              </div>
+            </div>
 
-        <aside className="hero-manifesto" aria-label="Freepack brand promise">
-          <span className="manifesto-index">01 — 03</span>
-          <div className="manifesto-lines">
-            <strong>LESS WASTE</strong>
-            <strong>MORE REACH</strong>
-            <strong>BETTER PACKAGING</strong>
-          </div>
-          <p>Useful packaging for takeaways. Real-world reach for brands. One shared production model.</p>
-          <span className="manifesto-tagline">GOOD PACKAGING<br />GOES FURTHER.</span>
-        </aside>
-      </section>
+            <aside className="hero-manifesto" aria-label="What Freepack does">
+              <span className="manifesto-index">THE FREEPACK MODEL</span>
+              <div className="manifesto-lines">
+                <strong>FREE FOR TAKEAWAYS</strong>
+                <strong>VISIBLE FOR BRANDS</strong>
+                <strong>USEFUL FOR EVERYONE</strong>
+              </div>
+              <p>One shared bag. Multiple advertisers. Thousands of everyday customer interactions.</p>
+              <span className="manifesto-tagline">GOOD PACKAGING<br />GOES FURTHER.</span>
+            </aside>
+          </section>
 
-      <section className="split shell" id="how">
-        <article className="card takeaway">
-          <div className="icon"><PackageCheck /></div>
-          <p className="kicker">FOR TAKEAWAYS</p>
-          <h2>Order by the box.<br />Pay £0.</h2>
-          <p>Choose the bag size you need and order available stock. Every takeaway receives the same shared campaign bags from that production run.</p>
-          <a href="#bags">Get free packaging <ArrowRight size={16} /></a>
-        </article>
+          <section className="about-freepack shell">
+            <div className="about-freepack-heading">
+              <p className="kicker">WHO WE ARE</p>
+              <h2>We turn everyday packaging into something more useful.</h2>
+            </div>
+            <div className="about-freepack-copy">
+              <p>
+                Freepack is a shared-packaging platform built around a simple idea: takeaways should not
+                have to keep absorbing the cost of disposable bags, while brands need better ways to reach
+                people in the real world.
+              </p>
+              <p>
+                We bring the two together. Brands buy space on upcoming production runs and that advertising
+                pays for the bags. The finished bags are then supplied to participating takeaways at no cost.
+              </p>
+            </div>
+          </section>
 
-        <article className="card advertiser">
-          <div className="icon"><Megaphone /></div>
-          <p className="kicker">FOR ADVERTISERS</p>
-          <h2>Put your brand in<br />customers' hands.</h2>
-          <p>Choose a run, rotate the bag, tap a 3 cm × 3 cm unit and grow a rectangular space directly on the 3D bag before uploading your artwork.</p>
-          <a href="#advertise">Try the selector <ArrowRight size={16} /></a>
-        </article>
-      </section>
-
-      <section className="brand-promise shell" aria-label="Why Freepack works">
-        <article>
-          <span>01</span>
-          <strong>Better for people</strong>
-          <p>Takeaways get useful, quality packaging without paying for the bags.</p>
-        </article>
-        <article>
-          <span>02</span>
-          <strong>Brighter for brands</strong>
-          <p>Advertisers buy visible space on packaging that moves through the real world.</p>
-        </article>
-        <article>
-          <span>03</span>
-          <strong>Cleaner for tomorrow</strong>
-          <p>Shared production keeps the model simple, useful and focused on less waste.</p>
-        </article>
-      </section>
-
-      <section className="runs shell" id="bags">
-        <div className="runs-heading">
-          <div>
-            <p className="kicker">OPEN ADVERTISING RUNS</p>
-            <h2>Choose a bag size.</h2>
-          </div>
-          <p>Every size has its own advertising layout, while the price per 3 cm square stays the same.</p>
-        </div>
-
-        <div className="run-options">
-          {runs.map((item) => {
-            const sold = PANEL_ORDER.reduce((sum, key) => sum + item.soldByPanel[key].length, 0)
-            const availability = Math.round(((item.totalBagSquares - sold) / item.totalBagSquares) * 100)
-
-            return (
-              <button
-                key={item.id}
-                className={`run-option ${runId === item.id ? 'active' : ''}`}
-                onClick={() => {
-                  changeRun(item.id)
-                  document.getElementById('advertise')?.scrollIntoView({ behavior: 'smooth' })
-                }}
-              >
-                <div className="run-option-top">
-                  <span>{item.size}</span>
-                  {runId === item.id && <Check size={17} />}
-                </div>
-                <strong>{item.dimensions}</strong>
-                <div className="run-option-meta">
-                  <span>{item.totalBagSquares} total bag squares</span>
-                  <span>{availability}% available across full bag</span>
-                </div>
-                <div className="availability-track">
-                  <i style={{ width: `${availability}%` }} />
-                </div>
-                <small><CalendarDays size={13} /> Est. start {item.estimatedStart}</small>
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="takeaway-order shell" id="takeaway-order">
-        <div className="takeaway-order-head">
-          <div>
-            <p className="kicker">FREE BAGS FOR TAKEAWAYS</p>
-            <h2>Build your box order.</h2>
-          </div>
-          <div className="free-badge">£0 for the bags</div>
-        </div>
-
-        <div className="takeaway-layout">
-          <div className="takeaway-products">
-            {runs.map((item) => (
-              <article className="takeaway-product" key={item.id}>
-                <div
-                  className="mini-bag"
-                  style={{
-                    width: `${(item.faceWidth / item.height) * ((item.height / 413) * MINI_BAG_MAX_HEIGHT)}px`,
-                    height: `${(item.height / 413) * MINI_BAG_MAX_HEIGHT}px`,
-                  }}
-                >
-                  <span>{item.size}</span>
-                </div>
-                <div className="takeaway-product-copy">
-                  <span className="takeaway-size">{item.size}</span>
-                  <strong>{item.dimensions}</strong>
-                  <small>250 bags per box · current shared design</small>
-                </div>
-                <div className="quantity-control" aria-label={`${item.size} box quantity`}>
-                  <button onClick={() => changeBoxQuantity(item.id, -1)} disabled={!bagBoxes[item.id]}>
-                    <Minus size={15} />
-                  </button>
-                  <strong>{bagBoxes[item.id]}</strong>
-                  <button onClick={() => changeBoxQuantity(item.id, 1)}>
-                    <Plus size={15} />
-                  </button>
+          <section className="how-model shell" id="how">
+            <div className="how-model-intro">
+              <p className="kicker">WHAT WE DO</p>
+              <h2>A simple exchange that benefits both sides.</h2>
+            </div>
+            <div className="how-model-steps">
+              <article>
+                <span>01</span>
+                <div>
+                  <strong>Brands fund a production run</strong>
+                  <p>Advertisers choose a bag size, select the exact space they want and upload their artwork.</p>
                 </div>
               </article>
-            ))}
-          </div>
-
-          <aside className="takeaway-summary">
-            <div className="summary-icon"><Truck size={21} /></div>
-            <p className="kicker">YOUR ORDER</p>
-            <div className="summary-number">{totalBoxes}</div>
-            <span className="summary-label">box{totalBoxes === 1 ? '' : 'es'} · {totalBags.toLocaleString()} bags</span>
-
-            <div className="summary-lines">
-              {runs.filter((item) => bagBoxes[item.id] > 0).map((item) => (
-                <div key={item.id}>
-                  <span>{item.size}</span>
-                  <strong>{bagBoxes[item.id]} × 250</strong>
+              <article>
+                <span>02</span>
+                <div>
+                  <strong>We print one shared design</strong>
+                  <p>Approved adverts are combined on the same production run, keeping the model simple and scalable.</p>
                 </div>
-              ))}
-              {totalBoxes === 0 && <p>Choose the bag sizes and number of boxes you need.</p>}
+              </article>
+              <article>
+                <span>03</span>
+                <div>
+                  <strong>Takeaways receive the bags free</strong>
+                  <p>Food businesses order the sizes they need and put the bags straight into everyday circulation.</p>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section className="home-pathways shell" aria-label="Choose how to use Freepack">
+            <article className="pathway-card pathway-bags">
+              <div className="pathway-icon"><PackageCheck size={24} /></div>
+              <p className="kicker">FOR TAKEAWAYS</p>
+              <h2>Free bags for your business.</h2>
+              <p>Browse the available bag sizes, choose how many boxes you need and submit your order for £0.</p>
+              <a className="button button-dark" href="/bags">Order free bags <ArrowRight size={17} /></a>
+            </article>
+
+            <article className="pathway-card pathway-ads">
+              <div className="pathway-icon"><Megaphone size={24} /></div>
+              <p className="kicker">FOR ADVERTISERS</p>
+              <h2>Put your brand in customers' hands.</h2>
+              <p>Choose a live production run, pick your exact advertising space and see your artwork on the bag.</p>
+              <a className="button button-dark" href="/advertise">Buy advertising space <ArrowRight size={17} /></a>
+            </article>
+          </section>
+
+          <section className="brand-promise shell" aria-label="Why Freepack works">
+            <article>
+              <span>01</span>
+              <strong>Better for people</strong>
+              <p>Takeaways get useful, quality packaging without paying for the bags.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <strong>Brighter for brands</strong>
+              <p>Advertising becomes something physical that travels with customers through the real world.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <strong>Cleaner for tomorrow</strong>
+              <p>Shared production keeps the model focused, efficient and designed around useful packaging.</p>
+            </article>
+          </section>
+        </>
+      )}
+
+      {publicPage === 'bags' && (
+        <>
+          <section className="page-hero shell">
+            <a className="page-back" href="/"><ArrowLeft size={16} /> About Freepack</a>
+            <p className="eyebrow">FREE PACKAGING FOR TAKEAWAYS</p>
+            <h1>Choose your bags.<br /><em>Pay £0.</em></h1>
+            <p>Pick the sizes and box quantities your business needs. Available stock is supplied free because the production run has already been funded by advertisers.</p>
+          </section>
+
+          <section className="takeaway-order shell" id="takeaway-order">
+            <div className="takeaway-order-head">
+              <div>
+                <p className="kicker">AVAILABLE BAG SIZES</p>
+                <h2>Build your box order.</h2>
+              </div>
+              <div className="free-badge">£0 for the bags</div>
             </div>
 
-            <div className="summary-total">
-              <span>Bag cost</span>
-              <strong>£0.00</strong>
-            </div>
-            <button
-              className="button button-dark takeaway-continue"
-              disabled={totalBoxes === 0}
-              onClick={openTakeawayCheckout}
-            >
-              Continue with order <ArrowRight size={17} />
-            </button>
-            <small className="summary-note">Business verification, availability and delivery details will be added when accounts are connected.</small>
-          </aside>
-        </div>
-      </section>
+            <div className="takeaway-layout">
+              <div className="takeaway-products">
+                {runs.map((item) => (
+                  <article className="takeaway-product" key={item.id}>
+                    <div
+                      className="mini-bag"
+                      style={{
+                        width: `${(item.faceWidth / item.height) * ((item.height / 413) * MINI_BAG_MAX_HEIGHT)}px`,
+                        height: `${(item.height / 413) * MINI_BAG_MAX_HEIGHT}px`,
+                      }}
+                    >
+                      <span>{item.size}</span>
+                    </div>
+                    <div className="takeaway-product-copy">
+                      <span className="takeaway-size">{item.size}</span>
+                      <strong>{item.dimensions}</strong>
+                      <small>250 bags per box · current shared design</small>
+                    </div>
+                    <div className="quantity-control" aria-label={`${item.size} box quantity`}>
+                      <button onClick={() => changeBoxQuantity(item.id, -1)} disabled={!bagBoxes[item.id]}>
+                        <Minus size={15} />
+                      </button>
+                      <strong>{bagBoxes[item.id]}</strong>
+                      <button onClick={() => changeBoxQuantity(item.id, 1)}>
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
 
-      <section className="campaign shell" id="advertise">
-        <div className="campaign-copy">
-          <p className="kicker">INTERACTIVE AD SELECTOR</p>
-          <h2>Choose the exact<br />space you want.</h2>
-          <p className="muted">
-            Build your advert directly on the bag. Start with 1 × 1, tap left or right to add a column,
-            then tap above or below to add a row. For example: 1 × 1 → 1 × 2 → 2 × 2 → 3 × 2.
-          </p>
+              <aside className="takeaway-summary">
+                <div className="summary-icon"><Truck size={21} /></div>
+                <p className="kicker">YOUR ORDER</p>
+                <div className="summary-number">{totalBoxes}</div>
+                <span className="summary-label">box{totalBoxes === 1 ? '' : 'es'} · {totalBags.toLocaleString()} bags</span>
 
-          {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
-          <div className="run-switcher" aria-label="Choose bag run">
-            {runs.map((item) => (
-              <button
-                key={item.id}
-                className={runId === item.id ? 'active' : ''}
-                onClick={() => changeRun(item.id)}
-              >
-                {item.size}
-              </button>
-            ))}
-          </div>
+                <div className="summary-lines">
+                  {runs.filter((item) => bagBoxes[item.id] > 0).map((item) => (
+                    <div key={item.id}>
+                      <span>{item.size}</span>
+                      <strong>{bagBoxes[item.id]} × 250</strong>
+                    </div>
+                  ))}
+                  {totalBoxes === 0 && <p>Choose the bag sizes and number of boxes you need.</p>}
+                </div>
 
-          <div className="run-card">
-            <div>
-              <span className="run-label">CURRENT RUN</span>
-              <strong>{run.size} bag · Run {run.id}</strong>
-              <small>{run.dimensions}</small>
-            </div>
-            <span className="run-status"><i /> Selling</span>
-          </div>
-
-          <div className="surface-tabs" aria-label="Choose bag face">
-            {PANEL_ORDER.map((key) => {
-              const face = panels[key]
-              const sold = run.soldByPanel[key].length
-              const available = face.cols * face.rows - sold
-              return (
+                <div className="summary-total">
+                  <span>Bag cost</span>
+                  <strong>£0.00</strong>
+                </div>
                 <button
-                  key={key}
-                  className={panelKey === key ? 'active' : ''}
-                  onClick={() => changePanel(key)}
+                  className="button button-dark takeaway-continue"
+                  disabled={totalBoxes === 0}
+                  onClick={openTakeawayCheckout}
                 >
-                  <span>{face.shortLabel}</span>
-                  <small>{available} free</small>
+                  Continue with order <ArrowRight size={17} />
                 </button>
-              )
-            })}
-          </div>
-
-          <div className="run-facts">
-            <span><strong>{panelAvailability}%</strong> {panel.label.toLowerCase()} available</span>
-            <span><strong>{totalAvailability}%</strong> whole bag available</span>
-            <span><strong>{run.estimatedStart}</strong> estimated start</span>
-          </div>
-
-          <div className="quote-card">
-            <div className="quote-row">
-              <span>Bag face</span>
-              <strong>{panel.label}</strong>
+                <small className="summary-note">Orders are reviewed for business verification and stock availability before dispatch.</small>
+              </aside>
             </div>
-            <div className="quote-row">
-              <span>Selected shape</span>
-              <strong>{shapeLabel(selection)}</strong>
-            </div>
-            <div className="quote-row">
-              <span>3 cm squares</span>
-              <strong>{selectedCount}</strong>
-            </div>
-            <div className="quote-row">
-              <span>Demo price / square</span>
-              <strong>£{(squarePricePence / 100).toFixed(2)}</strong>
-            </div>
-            <div className="quote-total">
-              <span>Demo total</span>
-              <strong>£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-            </div>
-            <small>Live pricing is loaded from the production run. The same square price applies across every bag face.</small>
-          </div>
+          </section>
+        </>
+      )}
 
-          <div className="selector-actions">
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
-              hidden
-              onChange={(event) => uploadArtwork(event.target.files?.[0])}
-            />
-            <button
-              className="button upload-button"
-              disabled={!selection}
-              onClick={() => fileInput.current?.click()}
-            >
-              <ImagePlus size={18} />
-              {artwork ? 'Change artwork' : 'Upload artwork'}
-            </button>
-            <button className="reset-button" onClick={clearSelection} disabled={!selection && !preview}>
-              <RotateCcw size={16} /> Reset
-            </button>
-          </div>
+      {publicPage === 'advertise' && (
+        <>
+          <section className="page-hero shell">
+            <a className="page-back" href="/"><ArrowLeft size={16} /> About Freepack</a>
+            <p className="eyebrow">ADVERTISING THAT TRAVELS</p>
+            <h1>Put your brand<br /><em>in their hands.</em></h1>
+            <p>Choose an upcoming production run, select the exact area you want on the bag and upload your artwork. Your advert then travels with every bag in that run.</p>
+          </section>
 
-          <button
-            className="button checkout-button"
-            disabled={!selection || !artwork}
-            onClick={() => setCheckoutOpen(true)}
-          >
-            Review & continue <ArrowRight size={17} />
-          </button>
-          {!artwork && selection && <p className="checkout-hint">Upload artwork to continue.</p>}
-        </div>
+          <section className="runs shell" id="runs">
+            <div className="runs-heading">
+              <div>
+                <p className="kicker">OPEN ADVERTISING RUNS</p>
+                <h2>Choose a bag size.</h2>
+              </div>
+              <p>Every size has its own advertising layout, while the price per 3 cm square stays the same.</p>
+            </div>
 
-        <div className="bag-wrap bag-wrap-true3d">
-          <Bag3D
-            widthMm={run.faceWidth}
-            depthMm={run.sideWidth}
-            heightMm={run.height}
-            panels={panels}
-            soldByPanel={run.soldByPanel}
-            sponsorArtwork={sponsorArtwork}
-            activePanel={panelKey}
-            selection={selection}
-            artwork={artwork}
-            onPanelChange={(key) => setPanelKey(key)}
-            onCellSelect={chooseGridCell}
-          />
+            <div className="run-options">
+              {runs.map((item) => {
+                const sold = PANEL_ORDER.reduce((sum, key) => sum + item.soldByPanel[key].length, 0)
+                const availability = Math.round(((item.totalBagSquares - sold) / item.totalBagSquares) * 100)
 
-          {placementMessage && (
-            <div className="selection-warning">{placementMessage}</div>
-          )}
-          <p className="bag-help">
-            {selection
-              ? `Selected: ${shapeLabel(selection)} on ${panel.label}. Rotate the bag and tap a free square beside the selected edge to grow it.`
-              : 'Rotate the bag freely, then tap any available grid square to start with 1 × 1.'}
-          </p>
-        </div>
-      </section>
+                return (
+                  <button
+                    key={item.id}
+                    className={`run-option ${runId === item.id ? 'active' : ''}`}
+                    onClick={() => {
+                      changeRun(item.id)
+                      document.getElementById('advertise')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                  >
+                    <div className="run-option-top">
+                      <span>{item.size}</span>
+                      {runId === item.id && <Check size={17} />}
+                    </div>
+                    <strong>{item.dimensions}</strong>
+                    <div className="run-option-meta">
+                      <span>{item.totalBagSquares} total bag squares</span>
+                      <span>{availability}% available across full bag</span>
+                    </div>
+                    <div className="availability-track">
+                      <i style={{ width: `${availability}%` }} />
+                    </div>
+                    <small><CalendarDays size={13} /> Est. start {item.estimatedStart}</small>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          <section className="campaign shell" id="advertise">
+            <div className="campaign-copy">
+              <p className="kicker">INTERACTIVE AD SELECTOR</p>
+              <h2>Choose the exact<br />space you want.</h2>
+              <p className="muted">
+                Build your advert directly on the bag. Start with 1 × 1, tap left or right to add a column,
+                then tap above or below to add a row. For example: 1 × 1 → 1 × 2 → 2 × 2 → 3 × 2.
+              </p>
+
+              {runsLoading && <div className="live-data-note">Loading live run availability…</div>}
+              <div className="run-switcher" aria-label="Choose bag run">
+                {runs.map((item) => (
+                  <button
+                    key={item.id}
+                    className={runId === item.id ? 'active' : ''}
+                    onClick={() => changeRun(item.id)}
+                  >
+                    {item.size}
+                  </button>
+                ))}
+              </div>
+
+              <div className="run-card">
+                <div>
+                  <span className="run-label">CURRENT RUN</span>
+                  <strong>{run.size} bag · Run {run.id}</strong>
+                  <small>{run.dimensions}</small>
+                </div>
+                <span className="run-status"><i /> Selling</span>
+              </div>
+
+              <div className="surface-tabs" aria-label="Choose bag face">
+                {PANEL_ORDER.map((key) => {
+                  const face = panels[key]
+                  const sold = run.soldByPanel[key].length
+                  const available = face.cols * face.rows - sold
+                  return (
+                    <button
+                      key={key}
+                      className={panelKey === key ? 'active' : ''}
+                      onClick={() => changePanel(key)}
+                    >
+                      <span>{face.shortLabel}</span>
+                      <small>{available} free</small>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="run-facts">
+                <span><strong>{panelAvailability}%</strong> {panel.label.toLowerCase()} available</span>
+                <span><strong>{totalAvailability}%</strong> whole bag available</span>
+                <span><strong>{run.estimatedStart}</strong> estimated start</span>
+              </div>
+
+              <div className="quote-card">
+                <div className="quote-row">
+                  <span>Bag face</span>
+                  <strong>{panel.label}</strong>
+                </div>
+                <div className="quote-row">
+                  <span>Selected shape</span>
+                  <strong>{shapeLabel(selection)}</strong>
+                </div>
+                <div className="quote-row">
+                  <span>3 cm squares</span>
+                  <strong>{selectedCount}</strong>
+                </div>
+                <div className="quote-row">
+                  <span>Price / square</span>
+                  <strong>£{(squarePricePence / 100).toFixed(2)}</strong>
+                </div>
+                <div className="quote-total">
+                  <span>Total</span>
+                  <strong>£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </div>
+                <small>The same square price applies across every bag face on this production run.</small>
+              </div>
+
+              <div className="selector-actions">
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  hidden
+                  onChange={(event) => uploadArtwork(event.target.files?.[0])}
+                />
+                <button
+                  className="button upload-button"
+                  disabled={!selection}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <ImagePlus size={18} />
+                  {artwork ? 'Change artwork' : 'Upload artwork'}
+                </button>
+                <button className="reset-button" onClick={clearSelection} disabled={!selection && !preview}>
+                  <RotateCcw size={16} /> Reset
+                </button>
+              </div>
+
+              <button
+                className="button checkout-button"
+                disabled={!selection || !artwork}
+                onClick={() => setCheckoutOpen(true)}
+              >
+                Review & continue <ArrowRight size={17} />
+              </button>
+              {!artwork && selection && <p className="checkout-hint">Upload artwork to continue.</p>}
+            </div>
+
+            <div className="bag-wrap bag-wrap-true3d">
+              <Bag3D
+                widthMm={run.faceWidth}
+                depthMm={run.sideWidth}
+                heightMm={run.height}
+                panels={panels}
+                soldByPanel={run.soldByPanel}
+                sponsorArtwork={sponsorArtwork}
+                activePanel={panelKey}
+                selection={selection}
+                artwork={artwork}
+                onPanelChange={(key) => setPanelKey(key)}
+                onCellSelect={chooseGridCell}
+              />
+
+              {placementMessage && (
+                <div className="selection-warning">{placementMessage}</div>
+              )}
+              <p className="bag-help">
+                {selection
+                  ? `Selected: ${shapeLabel(selection)} on ${panel.label}. Rotate the bag and tap a free square beside the selected edge to grow it.`
+                  : 'Rotate the bag freely, then tap any available grid square to start with 1 × 1.'}
+              </p>
+            </div>
+          </section>
+        </>
+      )}
 
       {adminOpen && isAdmin && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setAdminOpen(false)}>
