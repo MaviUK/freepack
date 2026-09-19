@@ -429,7 +429,13 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
 @media (max-width: 520px) {
   .shell { width: min(100% - 24px, 1180px); }
   .nav { height:70px; }
-  .nav .button { display:none; }
+  .nav .button {
+    display:inline-flex;
+    padding:9px 12px;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  .nav-actions { gap:6px; }
   h1 { font-size: 54px; }
   .hero > p { font-size:17px; }
   .split { gap:12px; }
@@ -1036,7 +1042,7 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
 }
 
 @media (max-width:520px) {
-  .nav-actions .admin-nav-button { display:none; }
+  .nav-actions .admin-nav-button { display:inline-flex; }
 }
 
 
