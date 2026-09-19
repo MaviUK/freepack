@@ -1603,8 +1603,16 @@ export default function App() {
   }
 
   function changePanel(key: PanelKey) {
+    if (key === panelKey) return
+
     setPanelKey(key)
-    clearSelection()
+    setDragStart(null)
+    setPreview(null)
+    setSelection(null)
+    setPlacementMessage('Choose a position on this face. Your uploaded artwork has been kept.')
+    setReservationMessage('')
+    setActiveBookingId(null)
+    setCheckoutOpen(false)
   }
 
   function rotatePanel(direction: 1 | -1) {
@@ -1626,8 +1634,6 @@ export default function App() {
       setPreview(rect)
       setSelection(rect)
       setPlacementMessage('1 × 1 selected. Tap a free square directly beside it to add a row or column.')
-      setArtwork(null)
-      setArtworkFile(null)
       setReservationMessage('')
       setActiveBookingId(null)
       setCheckoutOpen(false)
