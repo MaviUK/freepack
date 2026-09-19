@@ -1153,8 +1153,6 @@ export default function App() {
   }
 
   async function updateOrderStatus(orderId: string, status: 'approved' | 'dispatching' | 'dispatched' | 'completed' | 'cancelled') {
-    setAdminMessage('')
-
     const { error } = await supabase
       .from('takeaway_orders')
       .update({ status, updated_at: new Date().toISOString() })
@@ -1168,29 +1166,6 @@ export default function App() {
     setAdminOrders((current) => current.map((order) =>
       order.id === orderId ? { ...order, status } : order,
     ))
-
-    const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-takeaway-order-update', {
-      body: { order_id: orderId },
-    })
-
-    if (notifyError || !notifyData?.ok) {
-      let message = notifyData?.error || notifyError?.message || 'Order updated, but the customer email could not be sent.'
-      const context = (notifyError as { context?: Response } | null)?.context
-
-      if (context) {
-        try {
-          const body = await context.clone().json() as { error?: string }
-          if (body?.error) message = body.error
-        } catch {
-          // Keep fallback message.
-        }
-      }
-
-      setAdminMessage(message)
-      return
-    }
-
-    setAdminMessage('Order status updated and customer notified by email.')
   }
 
   async function exportProductionPack(run: AdminRun) {
@@ -1918,17 +1893,7 @@ export default function App() {
     }
 
     setTakeawayOrderId(order.id)
-
-    const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-takeaway-order-update', {
-      body: { order_id: order.id },
-    })
-
-    if (notifyError || !notifyData?.ok) {
-      setTakeawayMessage('Order submitted. We’ll verify the business and confirm availability before dispatch. Your confirmation email may be delayed.')
-    } else {
-      setTakeawayMessage('Order submitted. We’ve emailed your confirmation and will verify the business and stock availability.')
-    }
-
+    setTakeawayMessage('Order submitted. We’ll verify the business and confirm availability before dispatch.')
     setTakeawaySubmitting(false)
     setBagBoxes((current) => Object.fromEntries(Object.keys(current).map((key) => [key, 0])))
   }
