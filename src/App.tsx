@@ -242,7 +242,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 175,
     sideWidth: 113,
     height: 350,
-    totalBagSquares: 104,
+    totalBagSquares: 112,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -258,7 +258,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 200,
     sideWidth: 115,
     height: 375,
-    totalBagSquares: 120,
+    totalBagSquares: 130,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -274,7 +274,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 138,
     height: 413,
-    totalBagSquares: 212,
+    totalBagSquares: 226,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -335,12 +335,13 @@ function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
 }
 
 const BRAND_ROWS_BY_SIZE: Record<BagRun['size'], number[]> = {
+  // Small keeps a two-row clear zone; the other sizes use a tighter single-row
+  // clear zone so one extra advert row can sit closer to the centred logo.
   Small: [3, 4],
-  Medium: [4, 5],
-  // L-001 already has paid artwork ending on row 4, so the permanent
-  // Freepack band sits immediately below centre rather than covering it.
-  Large: [5, 6],
-  XL: [5, 6],
+  Medium: [4],
+  // L-001 has paid artwork through row 4, so row 5 remains the protected logo row.
+  Large: [5],
+  XL: [5],
 }
 
 function brandRowsForRun(run: BagRun) {
