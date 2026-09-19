@@ -49,11 +49,15 @@ type AdminBooking = {
   created_at: string
   profiles: { display_name: string | null } | { display_name: string | null }[] | null
   production_runs: {
+    id: string
     run_code: string
-    bag_sizes: { name: string } | { name: string }[] | null
+    status: string
+    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   } | {
+    id: string
     run_code: string
-    bag_sizes: { name: string } | { name: string }[] | null
+    status: string
+    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   }[] | null
 }
 
@@ -94,11 +98,15 @@ type AccountBooking = {
   paid_at: string | null
   created_at: string
   production_runs: {
+    id: string
     run_code: string
-    bag_sizes: { name: string } | { name: string }[] | null
+    status: string
+    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   } | {
+    id: string
     run_code: string
-    bag_sizes: { name: string } | { name: string }[] | null
+    status: string
+    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
   }[] | null
 }
 
@@ -253,6 +261,23 @@ function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
   }
 }
 
+const RUN_PROGRESS = [
+  { key: 'selling', label: 'Recruiting advertisers' },
+  { key: 'funded', label: 'Advertising sold' },
+  { key: 'artwork_review', label: 'Artwork approval' },
+  { key: 'sent_to_print', label: 'Sent for print' },
+  { key: 'printing', label: 'Printing' },
+  { key: 'shipping', label: 'Shipping' },
+  { key: 'in_stock', label: 'In stock' },
+  { key: 'distributing', label: 'Distribution' },
+  { key: 'completed', label: 'Completed' },
+] as const
+
+function runProgressStep(status: string) {
+  const index = RUN_PROGRESS.findIndex((item) => item.key === status)
+  return index >= 0 ? index : 0
+}
+
 export default function App() {
   const [runs, setRuns] = useState<BagRun[]>(BAG_RUNS)
   const [runsLoading, setRunsLoading] = useState(true)
@@ -282,6 +307,7 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [accountLoading, setAccountLoading] = useState(false)
   const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
+  const [accountRunSales, setAccountRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
   const [accountError, setAccountError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
@@ -504,8 +530,10 @@ export default function App() {
             paid_at,
             created_at,
             production_runs (
+              id,
               run_code,
-              bag_sizes (name)
+              status,
+              bag_sizes (name, total_square_count)
             )
           `)
           .order('created_at', { ascending: false }),
@@ -534,8 +562,35 @@ export default function App() {
       if (bookingsResult.error || ordersResult.error) {
         setAccountError(bookingsResult.error?.message ?? ordersResult.error?.message ?? 'Could not load your account.')
       } else {
-        setAccountBookings((bookingsResult.data ?? []) as AccountBooking[])
+        const bookings = (bookingsResult.data ?? []) as AccountBooking[]
+        setAccountBookings(bookings)
         setAccountOrders((ordersResult.data ?? []) as AccountOrder[])
+
+        const runIds = Array.from(new Set(
+          bookings
+            .map((booking) => firstRelation(booking.production_runs)?.id)
+            .filter((id): id is string => Boolean(id)),
+        ))
+
+        if (runIds.length) {
+          const { data: salesCells } = await supabase
+            .from('ad_cells')
+            .select('production_run_id,status')
+            .in('production_run_id', runIds)
+
+          const metrics: Record<string, { sold: number; reserved: number }> = {}
+          for (const runId of runIds) metrics[runId] = { sold: 0, reserved: 0 }
+
+          for (const cell of salesCells ?? []) {
+            if (!metrics[cell.production_run_id]) continue
+            if (cell.status === 'sold') metrics[cell.production_run_id].sold += 1
+            if (cell.status === 'reserved') metrics[cell.production_run_id].reserved += 1
+          }
+
+          setAccountRunSales(metrics)
+        } else {
+          setAccountRunSales({})
+        }
       }
 
       setAccountLoading(false)
@@ -690,7 +745,7 @@ export default function App() {
     ))
   }
 
-  async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'printing' | 'in_stock' | 'distributing' | 'completed') {
+  async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
     const { error } = await supabase
       .from('production_runs')
       .update({ status, updated_at: new Date().toISOString() })
@@ -733,7 +788,7 @@ export default function App() {
             total_square_count
           )
         `)
-        .in('status', ['selling', 'funded', 'artwork_review', 'printing', 'in_stock', 'distributing'])
+        .in('status', ['selling', 'funded', 'artwork_review', 'sent_to_print', 'printing', 'shipping', 'in_stock', 'distributing'])
         .order('run_code')
 
       if (runsError || !runRows) {
@@ -1613,7 +1668,9 @@ export default function App() {
                             <option value="selling">Selling advertising</option>
                             <option value="funded">Funded / closed</option>
                             <option value="artwork_review">Artwork approval</option>
+                            <option value="sent_to_print">Sent for print</option>
                             <option value="printing">Printing</option>
+                            <option value="shipping">Shipping</option>
                             <option value="in_stock">In stock</option>
                             <option value="distributing">Distribution</option>
                             <option value="completed">Completed</option>
@@ -1680,16 +1737,46 @@ export default function App() {
                         const runRelation = firstRelation(booking.production_runs)
                         const bagRelation = firstRelation(runRelation?.bag_sizes)
                         const statusLabel = booking.status.replaceAll('_', ' ')
+                        const runStatus = runRelation?.status ?? 'selling'
+                        const progressStep = runProgressStep(runStatus)
+                        const sales = runRelation ? accountRunSales[runRelation.id] : undefined
+                        const capacity = bagRelation?.total_square_count ?? 0
+                        const sold = sales?.sold ?? 0
+                        const reserved = sales?.reserved ?? 0
+                        const soldPercent = capacity > 0 ? Math.round((sold / capacity) * 100) : 0
 
                         return (
-                          <article className="account-item" key={booking.id}>
-                            <div>
-                              <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'}</strong>
-                              <span>{booking.panel} · {booking.square_count} square{booking.square_count === 1 ? '' : 's'}</span>
-                            </div>
-                            <div className="account-item-right">
-                              <strong>£{(booking.total_pence / 100).toFixed(2)}</strong>
+                          <article className="advertiser-tracker" key={booking.id}>
+                            <div className="advertiser-tracker-head">
+                              <div>
+                                <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'}</strong>
+                                <span>{booking.panel} · {booking.square_count} square{booking.square_count === 1 ? '' : 's'} · £{(booking.total_pence / 100).toFixed(2)}</span>
+                              </div>
                               <span className={`status-pill status-${booking.status}`}>{statusLabel}</span>
+                            </div>
+
+                            <div className="campaign-sales">
+                              <div className="campaign-sales-copy">
+                                <strong>{runStatus === 'selling' ? 'Recruiting advertisers' : 'Advertising sales'}</strong>
+                                <span>{sold} of {capacity || '—'} spaces sold{reserved ? ` · ${reserved} currently reserved` : ''}</span>
+                              </div>
+                              <strong>{capacity ? `${soldPercent}%` : '—'}</strong>
+                            </div>
+                            <div className="campaign-sales-bar">
+                              <i style={{ width: `${Math.min(100, soldPercent)}%` }} />
+                            </div>
+
+                            <div className="run-timeline" aria-label="Production progress">
+                              {RUN_PROGRESS.map((step, index) => {
+                                const complete = index < progressStep
+                                const current = index === progressStep
+                                return (
+                                  <div className={`run-step ${complete ? 'complete' : ''} ${current ? 'current' : ''}`} key={step.key}>
+                                    <i>{complete ? <Check size={11} /> : index + 1}</i>
+                                    <span>{step.label}</span>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </article>
                         )
