@@ -380,6 +380,7 @@ export default function App() {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [paymentBanner, setPaymentBanner] = useState('')
   const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null)
+  const [cancelledBookingId, setCancelledBookingId] = useState<string | null>(null)
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccess | null>(null)
   const [paymentSuccessSales, setPaymentSuccessSales] = useState<{ sold: number; capacity: number } | null>(null)
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false)
@@ -441,11 +442,13 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     const payment = params.get('payment')
     const sessionId = params.get('session_id')
+    const bookingId = params.get('booking_id')
     const confirmToken = params.get('confirm_token')
     const confirmType = params.get('confirm_type')
     const resetToken = params.get('reset_token')
     const resetType = params.get('reset_type')
     setPaymentSessionId(sessionId)
+    setCancelledBookingId(payment === 'cancelled' ? bookingId : null)
 
     async function startPasswordReset() {
       if (!resetToken) return
@@ -499,7 +502,7 @@ export default function App() {
     if (payment === 'success') {
       setPaymentBanner('Payment received. Confirming your advertising space…')
     } else if (payment === 'cancelled') {
-      setPaymentBanner('Payment was cancelled. Your reserved space remains held until the reservation expires.')
+      setPaymentBanner('Payment was cancelled. Restoring your reserved advertising space so you can try again…')
     }
 
     async function syncAuthState() {
@@ -1506,6 +1509,88 @@ export default function App() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!userId || !cancelledBookingId || runsLoading) return
+
+    let cancelled = false
+
+    async function restoreCancelledCheckout() {
+      const { data: booking, error } = await supabase
+        .from('ad_bookings')
+        .select('id,status,production_run_id,panel,top_row,left_col,width_cells,height_cells,total_pence,artwork_path,reserved_until')
+        .eq('id', cancelledBookingId)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (error || !booking) {
+        setPaymentBanner('We could not restore that reservation. Please choose your advertising space again.')
+        setCancelledBookingId(null)
+        return
+      }
+
+      if (
+        booking.status !== 'reserved' ||
+        !booking.reserved_until ||
+        new Date(booking.reserved_until).getTime() <= Date.now()
+      ) {
+        setPaymentBanner('That reservation has expired and the advertising space is available to select again.')
+        setCancelledBookingId(null)
+        return
+      }
+
+      const restoredRun = runs.find((item) => item.dbId === booking.production_run_id)
+      if (!restoredRun) {
+        setPaymentBanner('Your reservation is still held, but this production run could not be loaded.')
+        return
+      }
+
+      let artworkUrl: string | null = null
+      if (booking.artwork_path) {
+        const { data: signed } = await supabase.storage
+          .from('ad-artwork')
+          .createSignedUrl(booking.artwork_path, 1800)
+        artworkUrl = signed?.signedUrl ?? null
+      }
+
+      if (cancelled) return
+
+      const restoredSelection: Rect = {
+        top: booking.top_row,
+        left: booking.left_col,
+        bottom: booking.top_row + booking.height_cells - 1,
+        right: booking.left_col + booking.width_cells - 1,
+      }
+
+      setRunId(restoredRun.id)
+      setPanelKey(booking.panel as PanelKey)
+      setDragStart(null)
+      setPreview(restoredSelection)
+      setSelection(restoredSelection)
+      setArtwork(artworkUrl)
+      setArtworkFile(null)
+      setActiveBookingId(booking.id)
+      setReservationMessage('Your reserved space and artwork have been restored. You can continue to payment.')
+      setPlacementMessage('Your reserved advertising space has been restored.')
+      setCheckoutLoading(false)
+      setCheckoutOpen(true)
+      setPaymentBanner('Payment was cancelled. Your reservation is still held — continue whenever you are ready.')
+
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.searchParams.delete('payment')
+      cleanUrl.searchParams.delete('booking_id')
+      window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash)
+      setCancelledBookingId(null)
+    }
+
+    void restoreCancelledCheckout()
+
+    return () => {
+      cancelled = true
+    }
+  }, [cancelledBookingId, runs, runsLoading, userId])
 
   useEffect(() => {
     if (!run?.dbId) {
