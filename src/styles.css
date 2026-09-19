@@ -1711,3 +1711,109 @@ footer { height: 130px; display:flex; align-items:center; justify-content:space-
   .payment-receipt-grid { grid-template-columns:1fr; }
   .payment-success-actions { display:grid; }
 }
+
+
+.campaign-update {
+  margin-top:12px;
+  border-radius:12px;
+  background:#f5f2eb;
+  padding:11px 12px;
+  display:grid;
+  gap:4px;
+}
+.campaign-update strong {
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#5d7055;
+}
+.campaign-update span {
+  font-size:11px;
+  line-height:1.45;
+  color:#34332e;
+}
+.campaign-update small {
+  font-size:9px;
+  color:#858279;
+}
+
+.admin-campaign-item {
+  padding:15px 0;
+  border-bottom:1px solid rgba(23,23,19,.08);
+  display:grid;
+  gap:12px;
+}
+.admin-campaign-item:last-child { border-bottom:0; }
+.admin-campaign-head {
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  gap:14px;
+}
+.admin-campaign-head > strong {
+  color:#506648;
+  font-size:12px;
+  white-space:nowrap;
+}
+.admin-campaign-sales > span {
+  display:block;
+  color:#807c73;
+  font-size:9px;
+  margin-bottom:6px;
+}
+.admin-campaign-controls {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:end;
+}
+.admin-campaign-controls label {
+  display:grid;
+  gap:5px;
+  color:#77736b;
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.admin-campaign-controls select {
+  width:100%;
+  min-width:0;
+  border:1px solid rgba(23,23,19,.11);
+  border-radius:9px;
+  background:#f5f2eb;
+  color:#171713;
+  padding:9px 10px;
+  font-size:10px;
+  font-weight:800;
+  text-transform:none;
+  letter-spacing:0;
+}
+.admin-campaign-controls .button {
+  min-height:36px;
+  justify-content:center;
+}
+.admin-campaign-note {
+  border-radius:11px;
+  background:#f7f4ec;
+  padding:10px 11px;
+  display:grid;
+  gap:3px;
+}
+.admin-campaign-note span {
+  font-size:10px;
+  line-height:1.4;
+}
+.admin-campaign-note small {
+  color:#89857c;
+  font-size:9px;
+}
+
+@media (max-width:620px) {
+  .admin-campaign-head {
+    display:grid;
+  }
+  .admin-campaign-controls {
+    grid-template-columns:1fr;
+  }
+}
