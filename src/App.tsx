@@ -77,6 +77,8 @@ type AdminOrder = {
   id: string
   status: string
   created_at: string
+  shipping_pence: number
+  shipping_paid_at: string | null
   takeaway_businesses: {
     business_name: string
     postcode: string | null
@@ -188,6 +190,8 @@ type AccountOrder = {
   status: string
   created_at: string
   submitted_at: string | null
+  shipping_pence: number
+  shipping_paid_at: string | null
   takeaway_businesses: { business_name: string } | { business_name: string }[] | null
   takeaway_order_items: Array<{
     boxes: number
@@ -242,7 +246,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 175,
     sideWidth: 113,
     height: 350,
-    totalBagSquares: 186,
+    totalBagSquares: 160,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -258,7 +262,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 200,
     sideWidth: 115,
     height: 375,
-    totalBagSquares: 160,
+    totalBagSquares: 186,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -462,6 +466,8 @@ export default function App() {
   const [adminBookings, setAdminBookings] = useState<AdminBooking[]>([])
   const [adminOrders, setAdminOrders] = useState<AdminOrder[]>([])
   const [adminRuns, setAdminRuns] = useState<AdminRun[]>([])
+  const [shippingPricePence, setShippingPricePence] = useState(0)
+  const [takeawayPaymentSessionId, setTakeawayPaymentSessionId] = useState<string | null>(null)
   const [adminRunSales, setAdminRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
   const [adminExportingRun, setAdminExportingRun] = useState<string | null>(null)
   const [adminArtworkUrls, setAdminArtworkUrls] = useState<Record<string, string>>({})
@@ -516,15 +522,23 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const payment = params.get('payment')
+    const shippingPayment = params.get('shipping_payment')
     const sessionId = params.get('session_id')
     const bookingId = params.get('booking_id')
     const confirmToken = params.get('confirm_token')
     const confirmType = params.get('confirm_type')
     const resetToken = params.get('reset_token')
     const resetType = params.get('reset_type')
-    setPaymentSessionId(sessionId)
+    setPaymentSessionId(payment ? sessionId : null)
+    setTakeawayPaymentSessionId(shippingPayment === 'success' ? sessionId : null)
     setCancelledBookingId(payment === 'cancelled' ? bookingId : null)
     setCancelledPaymentReturn(payment === 'cancelled')
+
+    if (shippingPayment === 'success') {
+      setPaymentBanner('Delivery payment received. Confirming your free bag order…')
+    } else if (shippingPayment === 'cancelled') {
+      setPaymentBanner('Delivery payment was cancelled. Your order has not been submitted yet.')
+    }
 
     async function startPasswordReset() {
       if (!resetToken) return
@@ -609,6 +623,23 @@ export default function App() {
     })
 
     return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPlatformSettings() {
+      const { data } = await supabase
+        .from('platform_settings')
+        .select('shipping_price_pence')
+        .eq('id', 'default')
+        .maybeSingle()
+
+      if (!cancelled) setShippingPricePence(data?.shipping_price_pence ?? 0)
+    }
+
+    void loadPlatformSettings()
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -861,6 +892,53 @@ export default function App() {
   }, [userId, paymentSessionId])
 
   useEffect(() => {
+    if (!userId || !takeawayPaymentSessionId) return
+
+    const sessionId = takeawayPaymentSessionId
+    let cancelled = false
+    let attempts = 0
+    let timer: number | undefined
+
+    async function confirmTakeawayPayment() {
+      attempts += 1
+
+      const { data, error } = await supabase
+        .from('takeaway_orders')
+        .select('id,status,shipping_paid_at')
+        .eq('stripe_checkout_session_id', sessionId)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (!error && data?.shipping_paid_at && data.status === 'submitted') {
+        setTakeawayOrderId(data.id)
+        setTakeawayCheckoutOpen(true)
+        setTakeawayMessage('Delivery paid. Your free bag order has been submitted.')
+        setBagBoxes((current) => Object.fromEntries(Object.keys(current).map((key) => [key, 0])))
+        setPaymentBanner('')
+        const cleanUrl = new URL(window.location.href)
+        cleanUrl.searchParams.delete('shipping_payment')
+        cleanUrl.searchParams.delete('session_id')
+        window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash)
+        return
+      }
+
+      if (attempts < 6) {
+        timer = window.setTimeout(confirmTakeawayPayment, 1500)
+      } else {
+        setPaymentBanner('Delivery payment was received. Your order will appear in your account shortly.')
+      }
+    }
+
+    void confirmTakeawayPayment()
+
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [userId, takeawayPaymentSessionId])
+
+  useEffect(() => {
     if (!accountOpen || !userId) return
 
     let cancelled = false
@@ -902,7 +980,11 @@ export default function App() {
             id,
             status,
             created_at,
+            shipping_pence,
+            shipping_paid_at,
             submitted_at,
+            shipping_pence,
+            shipping_paid_at,
             takeaway_businesses (business_name),
             takeaway_order_items (
               boxes,
@@ -1385,6 +1467,56 @@ export default function App() {
     }
   }
 
+  async function updateRunPrice(runDbId: string, pounds: number) {
+    if (!Number.isFinite(pounds) || pounds < 0) {
+      setAdminMessage('Enter a valid advertising price.')
+      return
+    }
+
+    const pricePence = Math.round(pounds * 100)
+    const { error } = await supabase
+      .from('production_runs')
+      .update({ price_per_square_pence: pricePence, updated_at: new Date().toISOString() })
+      .eq('id', runDbId)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminRuns((current) => current.map((item) =>
+      item.id === runDbId ? { ...item, price_per_square_pence: pricePence } : item,
+    ))
+    setRuns((current) => current.map((item) =>
+      item.dbId === runDbId ? { ...item, pricePerSquarePence: pricePence } : item,
+    ))
+    setAdminMessage(`Advertising price updated to £${(pricePence / 100).toFixed(2)} per 3cm square.`)
+  }
+
+  async function updateShippingPrice(pounds: number) {
+    if (!Number.isFinite(pounds) || pounds < 0) {
+      setAdminMessage('Enter a valid shipping price.')
+      return
+    }
+
+    const pricePence = Math.round(pounds * 100)
+    const { error } = await supabase
+      .from('platform_settings')
+      .update({
+        shipping_price_pence: pricePence,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', 'default')
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setShippingPricePence(pricePence)
+    setAdminMessage(`Shipping price updated to £${(pricePence / 100).toFixed(2)} per order.`)
+  }
+
   async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
     setAdminMessage('')
 
@@ -1766,6 +1898,7 @@ export default function App() {
 
   const totalBoxes = Object.values(bagBoxes).reduce((sum, quantity) => sum + quantity, 0)
   const totalBags = totalBoxes * 250
+  const takeawayShippingPence = totalBoxes > 0 ? shippingPricePence : 0
 
   function changeBoxQuantity(id: string, delta: number) {
     setBagBoxes((current) => ({
@@ -2106,6 +2239,26 @@ export default function App() {
       return
     }
 
+    if (order.shipping_pence > 0) {
+      setTakeawayMessage('Opening secure payment for delivery…')
+
+      const { data: checkout, error: checkoutError } = await supabase.functions.invoke('create-takeaway-checkout', {
+        body: {
+          order_id: order.id,
+          return_origin: window.location.origin,
+        },
+      })
+
+      if (checkoutError || !checkout?.url) {
+        setTakeawayMessage(checkout?.error || checkoutError?.message || 'Could not open delivery payment.')
+        setTakeawaySubmitting(false)
+        return
+      }
+
+      window.location.assign(checkout.url)
+      return
+    }
+
     setTakeawayOrderId(order.id)
     setTakeawayMessage('Order submitted. We’ll verify the business and confirm availability before dispatch.')
     setTakeawaySubmitting(false)
@@ -2425,6 +2578,14 @@ export default function App() {
                 <div className="summary-total">
                   <span>Bag cost</span>
                   <strong>£0.00</strong>
+                </div>
+                <div className="summary-total shipping-total">
+                  <span>Shipping</span>
+                  <strong>{totalBoxes > 0 ? `£${(takeawayShippingPence / 100).toFixed(2)}` : '—'}</strong>
+                </div>
+                <div className="summary-total order-grand-total">
+                  <span>Total to pay</span>
+                  <strong>{totalBoxes > 0 ? `£${(takeawayShippingPence / 100).toFixed(2)}` : '£0.00'}</strong>
                 </div>
                 <button
                   className="button button-dark takeaway-continue"
@@ -2979,6 +3140,32 @@ export default function App() {
 
                     {adminSection === 'production' && (
                       <div className="admin-page-stack">
+                        <section className="admin-panel admin-pricing-panel">
+                          <div className="admin-panel-head">
+                            <div>
+                              <p className="kicker">COMMERCIAL SETTINGS</p>
+                              <h2>Prices</h2>
+                              <span>Set the live advert price for each production run and the flat shipping charge for free packaging orders.</span>
+                            </div>
+                          </div>
+                          <div className="admin-shipping-setting">
+                            <div>
+                              <strong>Packaging order shipping</strong>
+                              <span>Flat delivery charge per takeaway order</span>
+                            </div>
+                            <form onSubmit={(event) => {
+                              event.preventDefault()
+                              const form = new FormData(event.currentTarget)
+                              void updateShippingPrice(Number(form.get('shipping_price')))
+                            }}>
+                              <label>£
+                                <input name="shipping_price" type="number" min="0" step="0.01" defaultValue={(shippingPricePence / 100).toFixed(2)} />
+                              </label>
+                              <button type="submit">Save shipping</button>
+                            </form>
+                          </div>
+                        </section>
+
                         <section className="admin-panel">
                           <div className="admin-panel-head">
                             <div>
@@ -3017,6 +3204,21 @@ export default function App() {
                                     <div className="campaign-sales-bar"><i style={{ width: `${Math.min(100, soldPercent)}%` }} /></div>
                                     <small>{sales.sold} sold · {sales.reserved} reserved · {capacity} total spaces</small>
                                   </div>
+                                  <form className="admin-run-price" onSubmit={(event) => {
+                                    event.preventDefault()
+                                    const form = new FormData(event.currentTarget)
+                                    void updateRunPrice(item.id, Number(form.get('ad_price')))
+                                  }}>
+                                    <div>
+                                      <span>Advert price</span>
+                                      <small>Per 3cm square</small>
+                                    </div>
+                                    <label>£
+                                      <input name="ad_price" type="number" min="0" step="0.01" defaultValue={(item.price_per_square_pence / 100).toFixed(2)} />
+                                    </label>
+                                    <button type="submit">Save price</button>
+                                  </form>
+
                                   <div className="admin-production-controls">
                                     <label>
                                       Current stage
@@ -3073,7 +3275,7 @@ export default function App() {
                           ) : (
                             <div className="admin-table-wrap">
                               <table className="admin-table">
-                                <thead><tr><th>Business</th><th>Postcode</th><th>Boxes</th><th>Bags</th><th>Ordered</th><th>Status</th></tr></thead>
+                                <thead><tr><th>Business</th><th>Postcode</th><th>Boxes</th><th>Bags</th><th>Shipping</th><th>Ordered</th><th>Status</th></tr></thead>
                                 <tbody>
                                   {adminOrders.map((order) => {
                                     const business = firstRelation(order.takeaway_businesses)
@@ -3085,6 +3287,7 @@ export default function App() {
                                         <td>{business?.postcode ?? '—'}</td>
                                         <td><strong>{boxes}</strong></td>
                                         <td>{bags.toLocaleString('en-GB')}</td>
+                                        <td><strong>£{(order.shipping_pence / 100).toFixed(2)}</strong><small>{order.shipping_paid_at ? 'Paid' : order.shipping_pence > 0 ? 'Awaiting payment' : 'Free'}</small></td>
                                         <td><small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small></td>
                                         <td>
                                           <select className="admin-order-select" value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value as any)}>
@@ -3379,7 +3582,7 @@ export default function App() {
                               <span>{boxCount} box{boxCount === 1 ? '' : 'es'} · {bagCount.toLocaleString()} bags</span>
                             </div>
                             <div className="account-item-right">
-                              <strong>£0.00</strong>
+                              <strong>£{(order.shipping_pence / 100).toFixed(2)} shipping</strong>
                               <span className={`status-pill status-${order.status}`}>{order.status.replaceAll('_', ' ')}</span>
                             </div>
                           </article>
@@ -3438,7 +3641,7 @@ export default function App() {
               <form className="takeaway-form" onSubmit={submitTakeawayOrder}>
                 <div className="takeaway-order-mini-summary">
                   <strong>{totalBoxes} box{totalBoxes === 1 ? '' : 'es'}</strong>
-                  <span>{totalBags.toLocaleString()} bags · £0.00</span>
+                  <span>{totalBags.toLocaleString()} bags · shipping £{(takeawayShippingPence / 100).toFixed(2)}</span>
                 </div>
 
                 <div className="form-grid">
@@ -3500,7 +3703,11 @@ export default function App() {
                 {takeawayMessage && <div className="auth-message">{takeawayMessage}</div>}
 
                 <button className="button button-dark modal-primary" disabled={takeawaySubmitting}>
-                  {takeawaySubmitting ? 'Submitting…' : 'Submit free bag order'}
+                  {takeawaySubmitting
+                    ? 'Processing…'
+                    : takeawayShippingPence > 0
+                      ? `Continue to pay £${(takeawayShippingPence / 100).toFixed(2)} shipping`
+                      : 'Submit free bag order'}
                 </button>
                 <small className="summary-note">
                   Orders are reviewed before dispatch so we can verify the takeaway and manage fair stock allocation.
