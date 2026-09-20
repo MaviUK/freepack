@@ -6263,3 +6263,31 @@ summary:focus-visible {
     bottom: 10px;
   }
 }
+
+
+/* Center the 3D bag within the taller mobile preview while keeping controls in the black area */
+@media (max-width: 760px) {
+  .bag3d-canvas {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+
+  .bag3d-down {
+    bottom: 52px;
+  }
+}
+
+@media (max-width: 520px) {
+  .bag3d-canvas {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+
+  .bag3d-down {
+    bottom: 56px;
+  }
+}
