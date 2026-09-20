@@ -266,43 +266,61 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          id: string
+          shipping_price_pence: number
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          shipping_price_pence?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          shipping_price_pence?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       production_runs: {
         Row: {
           bag_quantity: number | null
           bag_size_id: string
           created_at: string
+          estimated_stage_date: string | null
           estimated_start_date: string | null
           id: string
           price_per_square_pence: number
           reservation_minutes: number
           run_code: string
           status: Database["public"]["Enums"]["run_status"]
-          status_updated_at: string
           status_note: string | null
-          estimated_stage_date: string | null
+          status_updated_at: string
           updated_at: string
         }
         Insert: {
           bag_quantity?: number | null
           bag_size_id: string
           created_at?: string
+          estimated_stage_date?: string | null
           estimated_start_date?: string | null
           id?: string
           price_per_square_pence?: number
           reservation_minutes?: number
           run_code: string
           status?: Database["public"]["Enums"]["run_status"]
-          status_updated_at?: string
           status_note?: string | null
-          estimated_stage_date?: string | null
+          status_updated_at?: string
           updated_at?: string
         }
         Update: {
           bag_quantity?: number | null
           bag_size_id?: string
           created_at?: string
-          estimated_start_date?: string | null
           estimated_stage_date?: string | null
+          estimated_start_date?: string | null
           id?: string
           price_per_square_pence?: number
           reservation_minutes?: number
@@ -449,7 +467,11 @@ export type Database = {
           created_at: string
           delivery_notes: string | null
           id: string
+          shipping_paid_at: string | null
+          shipping_pence: number
           status: Database["public"]["Enums"]["order_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
           submitted_at: string | null
           takeaway_business_id: string
           updated_at: string
@@ -459,7 +481,11 @@ export type Database = {
           created_at?: string
           delivery_notes?: string | null
           id?: string
+          shipping_paid_at?: string | null
+          shipping_pence?: number
           status?: Database["public"]["Enums"]["order_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           submitted_at?: string | null
           takeaway_business_id: string
           updated_at?: string
@@ -469,7 +495,11 @@ export type Database = {
           created_at?: string
           delivery_notes?: string | null
           id?: string
+          shipping_paid_at?: string | null
+          shipping_pence?: number
           status?: Database["public"]["Enums"]["order_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           submitted_at?: string | null
           takeaway_business_id?: string
           updated_at?: string
@@ -497,6 +527,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_auth_email_request: {
+        Args: { p_email: string }
+        Returns: boolean
+      }
       expire_ad_booking: {
         Args: { p_booking_id: string; p_checkout_session_id: string }
         Returns: undefined
@@ -505,6 +539,14 @@ export type Database = {
         Args: {
           p_booking_id: string
           p_checkout_session_id: string
+          p_payment_intent_id: string
+        }
+        Returns: undefined
+      }
+      mark_takeaway_order_shipping_paid: {
+        Args: {
+          p_checkout_session_id: string
+          p_order_id: string
           p_payment_intent_id: string
         }
         Returns: undefined
@@ -605,7 +647,11 @@ export type Database = {
           created_at: string
           delivery_notes: string | null
           id: string
+          shipping_paid_at: string | null
+          shipping_pence: number
           status: Database["public"]["Enums"]["order_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
           submitted_at: string | null
           takeaway_business_id: string
           updated_at: string
