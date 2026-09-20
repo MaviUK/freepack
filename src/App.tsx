@@ -92,6 +92,29 @@ type AdminOrder = {
   }>
 }
 
+type AdminCustomer = {
+  user_id: string
+  email: string | null
+  display_name: string | null
+  phone: string | null
+  account_type: string
+  joined_at: string
+  takeaway_business_id: string | null
+  business_name: string | null
+  business_phone: string | null
+  address_line_1: string | null
+  address_line_2: string | null
+  town_city: string | null
+  postcode: string | null
+  verified_at: string | null
+  ad_booking_count: number
+  paid_booking_count: number
+  ad_spend_pence: number
+  order_count: number
+  shipping_spend_pence: number
+  last_activity_at: string
+}
+
 type AdminRun = {
   id: string
   run_code: string
@@ -895,13 +918,15 @@ export default function App() {
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
   const [accountError, setAccountError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [adminSection, setAdminSection] = useState<'overview' | 'advertising' | 'artwork' | 'production' | 'orders'>('overview')
+  const [adminSection, setAdminSection] = useState<'overview' | 'advertising' | 'artwork' | 'production' | 'customers' | 'orders'>('overview')
   const [adminSearch, setAdminSearch] = useState('')
   const [adminBookingFilter, setAdminBookingFilter] = useState('all')
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminMessage, setAdminMessage] = useState('')
   const [adminBookings, setAdminBookings] = useState<AdminBooking[]>([])
   const [adminOrders, setAdminOrders] = useState<AdminOrder[]>([])
+  const [adminCustomers, setAdminCustomers] = useState<AdminCustomer[]>([])
+  const [adminCustomerSearch, setAdminCustomerSearch] = useState('')
   const [adminRuns, setAdminRuns] = useState<AdminRun[]>([])
   const [shippingPricePence, setShippingPricePence] = useState(0)
   const [takeawayPaymentSessionId, setTakeawayPaymentSessionId] = useState<string | null>(null)
@@ -1520,7 +1545,7 @@ export default function App() {
       setAdminLoading(true)
       setAdminMessage('')
 
-      const [bookingsResult, ordersResult, runsResult] = await Promise.all([
+      const [bookingsResult, ordersResult, runsResult, customersResult] = await Promise.all([
         supabase
           .from('ad_bookings')
           .select(`
@@ -1584,15 +1609,17 @@ export default function App() {
             )
           `)
           .order('run_code'),
+        (supabase as any).rpc('admin_list_customers'),
       ])
 
       if (cancelled) return
 
-      if (bookingsResult.error || ordersResult.error || runsResult.error) {
+      if (bookingsResult.error || ordersResult.error || runsResult.error || customersResult.error) {
         setAdminMessage(
           bookingsResult.error?.message ??
           ordersResult.error?.message ??
           runsResult.error?.message ??
+          customersResult.error?.message ??
           'Could not load admin data.',
         )
         setAdminLoading(false)
@@ -1602,6 +1629,7 @@ export default function App() {
       const bookings = (bookingsResult.data ?? []) as AdminBooking[]
       setAdminBookings(bookings)
       setAdminOrders((ordersResult.data ?? []) as AdminOrder[])
+      setAdminCustomers((customersResult.data ?? []) as AdminCustomer[])
       const adminRunsData = (runsResult.data ?? []) as AdminRun[]
       setAdminRuns(adminRunsData)
 
@@ -3486,6 +3514,10 @@ export default function App() {
               <button className={adminSection === 'production' ? 'active' : ''} onClick={() => setAdminSection('production')}>
                 <Box size={18} /> Production
               </button>
+              <button className={adminSection === 'customers' ? 'active' : ''} onClick={() => setAdminSection('customers')}>
+                <UserRound size={18} /> Customers
+                {adminCustomers.length > 0 && <span>{adminCustomers.length}</span>}
+              </button>
               <button className={adminSection === 'orders' ? 'active' : ''} onClick={() => setAdminSection('orders')}>
                 <Truck size={18} /> Takeaway orders
                 {adminOrders.filter((order) => order.status === 'submitted').length > 0 && (
@@ -3513,6 +3545,7 @@ export default function App() {
                   {adminSection === 'advertising' && 'Advertising'}
                   {adminSection === 'artwork' && 'Artwork approval'}
                   {adminSection === 'production' && 'Production'}
+                  {adminSection === 'customers' && 'Customers'}
                   {adminSection === 'orders' && 'Takeaway orders'}
                 </h1>
               </div>
@@ -3591,6 +3624,11 @@ export default function App() {
                               <span>Orders waiting</span>
                               <strong>{submittedOrders.length}</strong>
                               <small>{submittedOrders.length ? 'Awaiting approval' : 'Nothing waiting'}</small>
+                            </article>
+                            <article>
+                              <span>Customers</span>
+                              <strong>{adminCustomers.length}</strong>
+                              <small>{adminCustomers.filter((customer) => customer.account_type === 'advertiser').length} advertisers · {adminCustomers.filter((customer) => customer.account_type === 'takeaway').length} takeaways</small>
                             </article>
                           </section>
 
@@ -3908,6 +3946,167 @@ export default function App() {
                         </section>
                       </div>
                     )}
+
+                    {adminSection === 'customers' && (() => {
+                      const query = adminCustomerSearch.trim().toLowerCase()
+                      const filteredCustomers = adminCustomers.filter((customer) => {
+                        const haystack = [
+                          customer.display_name,
+                          customer.email,
+                          customer.phone,
+                          customer.account_type,
+                          customer.business_name,
+                          customer.business_phone,
+                          customer.town_city,
+                          customer.postcode,
+                          customer.user_id,
+                        ].filter(Boolean).join(' ').toLowerCase()
+                        return !query || haystack.includes(query)
+                      })
+                      const advertisers = adminCustomers.filter((customer) => customer.account_type === 'advertiser').length
+                      const takeaways = adminCustomers.filter((customer) => customer.account_type === 'takeaway').length
+                      const totalSpend = adminCustomers.reduce((sum, customer) => sum + Number(customer.ad_spend_pence || 0) + Number(customer.shipping_spend_pence || 0), 0)
+
+                      return (
+                        <div className="admin-page-stack">
+                          <section className="admin-summary-grid admin-customer-summary">
+                            <article>
+                              <span>Total customers</span>
+                              <strong>{adminCustomers.length}</strong>
+                              <small>Non-admin FreePack accounts</small>
+                            </article>
+                            <article>
+                              <span>Advertisers</span>
+                              <strong>{advertisers}</strong>
+                              <small>Accounts buying ad space</small>
+                            </article>
+                            <article>
+                              <span>Takeaways</span>
+                              <strong>{takeaways}</strong>
+                              <small>Accounts ordering free bags</small>
+                            </article>
+                            <article>
+                              <span>Customer payments</span>
+                              <strong>£{(totalSpend / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                              <small>Advertising + paid shipping</small>
+                            </article>
+                          </section>
+
+                          <section className="admin-panel">
+                            <div className="admin-panel-head admin-filter-head">
+                              <div>
+                                <p className="kicker">CUSTOMERS</p>
+                                <h2>Customer management</h2>
+                                <span>{filteredCustomers.length} customer{filteredCustomers.length === 1 ? '' : 's'}</span>
+                              </div>
+                              <div className="admin-filters admin-customer-filter">
+                                <input
+                                  value={adminCustomerSearch}
+                                  onChange={(event) => setAdminCustomerSearch(event.target.value)}
+                                  placeholder="Search name, email, business or postcode…"
+                                />
+                              </div>
+                            </div>
+
+                            {filteredCustomers.length === 0 ? (
+                              <p className="admin-empty">No customers match that search.</p>
+                            ) : (
+                              <div className="admin-customer-grid">
+                                {filteredCustomers.map((customer) => {
+                                  const isTakeaway = customer.account_type === 'takeaway'
+                                  const name = customer.business_name || customer.display_name || customer.email || 'Customer'
+                                  const address = [
+                                    customer.address_line_1,
+                                    customer.address_line_2,
+                                    customer.town_city,
+                                    customer.postcode,
+                                  ].filter(Boolean).join(', ')
+                                  return (
+                                    <article className="admin-customer-card" key={customer.user_id}>
+                                      <div className="admin-customer-head">
+                                        <div className="admin-customer-avatar">
+                                          {isTakeaway ? <ShoppingBag size={19} /> : <Megaphone size={19} />}
+                                        </div>
+                                        <div>
+                                          <strong>{name}</strong>
+                                          <span>{customer.email ?? 'No email available'}</span>
+                                        </div>
+                                        <span className="admin-customer-type">{isTakeaway ? 'Takeaway' : 'Advertiser'}</span>
+                                      </div>
+
+                                      <div className="admin-customer-stats">
+                                        <div>
+                                          <span>{isTakeaway ? 'Orders' : 'Bookings'}</span>
+                                          <strong>{isTakeaway ? customer.order_count : customer.ad_booking_count}</strong>
+                                        </div>
+                                        <div>
+                                          <span>{isTakeaway ? 'Shipping paid' : 'Ad spend'}</span>
+                                          <strong>£{((isTakeaway ? customer.shipping_spend_pence : customer.ad_spend_pence) / 100).toFixed(2)}</strong>
+                                        </div>
+                                        <div>
+                                          <span>Last activity</span>
+                                          <strong>{formatAccountDate(customer.last_activity_at)}</strong>
+                                        </div>
+                                      </div>
+
+                                      <div className="admin-customer-details">
+                                        {(customer.display_name || customer.phone) && (
+                                          <div>
+                                            <span>Contact</span>
+                                            <strong>{customer.display_name ?? '—'}{customer.phone ? ` · ${customer.phone}` : ''}</strong>
+                                          </div>
+                                        )}
+                                        {customer.business_name && (
+                                          <div>
+                                            <span>Business</span>
+                                            <strong>{customer.business_name}</strong>
+                                          </div>
+                                        )}
+                                        {customer.business_phone && (
+                                          <div>
+                                            <span>Business phone</span>
+                                            <strong>{customer.business_phone}</strong>
+                                          </div>
+                                        )}
+                                        {address && (
+                                          <div>
+                                            <span>Address</span>
+                                            <strong>{address}</strong>
+                                          </div>
+                                        )}
+                                        <div>
+                                          <span>Joined</span>
+                                          <strong>{formatAccountDate(customer.joined_at)}</strong>
+                                        </div>
+                                        {isTakeaway && (
+                                          <div>
+                                            <span>Verification</span>
+                                            <strong>{customer.verified_at ? `Verified ${formatAccountDate(customer.verified_at)}` : 'Not verified yet'}</strong>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="admin-customer-footer">
+                                        <span>#{customer.user_id.slice(0, 8).toUpperCase()}</span>
+                                        <div>
+                                          {customer.email && <a href={`mailto:${customer.email}`}>Email customer</a>}
+                                          {isTakeaway && customer.takeaway_business_id && (
+                                            <button onClick={() => setAdminSection('orders')}>View orders</button>
+                                          )}
+                                          {!isTakeaway && customer.ad_booking_count > 0 && (
+                                            <button onClick={() => { setAdminSearch(customer.display_name || customer.email || customer.user_id); setAdminSection('advertising') }}>View advertising</button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </article>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                      )
+                    })()}
 
                     {adminSection === 'orders' && (
                       <div className="admin-page-stack">
