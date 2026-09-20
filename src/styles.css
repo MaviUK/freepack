@@ -6225,3 +6225,41 @@ summary:focus-visible {
     bottom: 50px;
   }
 }
+
+
+/* Keep the mobile 3D model above a dedicated bottom control strip */
+@media (max-width: 760px) {
+  .bag3d-shell {
+    aspect-ratio: 1 / 1.22;
+  }
+
+  .bag3d-canvas {
+    bottom: 104px;
+  }
+
+  .bag3d-down {
+    bottom: 48px;
+  }
+
+  .bag3d-hint {
+    bottom: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .bag3d-shell {
+    aspect-ratio: 1 / 1.28;
+  }
+
+  .bag3d-canvas {
+    bottom: 118px;
+  }
+
+  .bag3d-down {
+    bottom: 54px;
+  }
+
+  .bag3d-hint {
+    bottom: 10px;
+  }
+}
