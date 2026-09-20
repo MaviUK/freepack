@@ -131,12 +131,20 @@ type AccountBooking = {
   artwork_path: string | null
   artwork_review_status: string
   artwork_review_notes: string | null
+  artwork_reviewed_at: string | null
   panel: PanelKey
+  top_row: number
+  left_col: number
+  width_cells: number
+  height_cells: number
   square_count: number
   total_pence: number
   reserved_until: string | null
   paid_at: string | null
   created_at: string
+  stripe_checkout_session_id: string | null
+  stripe_payment_intent_id: string | null
+  payment_currency: string | null
   production_runs: {
     id: string
     run_code: string
@@ -144,7 +152,7 @@ type AccountBooking = {
     status_updated_at: string
     status_note: string | null
     estimated_stage_date: string | null
-    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
+    bag_sizes: { name: string; total_square_count: number; square_size_mm: number } | { name: string; total_square_count: number; square_size_mm: number }[] | null
   } | {
     id: string
     run_code: string
@@ -152,7 +160,7 @@ type AccountBooking = {
     status_updated_at: string
     status_note: string | null
     estimated_stage_date: string | null
-    bag_sizes: { name: string; total_square_count: number } | { name: string; total_square_count: number }[] | null
+    bag_sizes: { name: string; total_square_count: number; square_size_mm: number } | { name: string; total_square_count: number; square_size_mm: number }[] | null
   }[] | null
 }
 
@@ -190,9 +198,24 @@ type AccountOrder = {
   status: string
   created_at: string
   submitted_at: string | null
+  delivery_notes: string | null
   shipping_pence: number
   shipping_paid_at: string | null
-  takeaway_businesses: { business_name: string } | { business_name: string }[] | null
+  stripe_checkout_session_id: string | null
+  stripe_payment_intent_id: string | null
+  takeaway_businesses: {
+    business_name: string
+    address_line_1: string | null
+    address_line_2: string | null
+    town_city: string | null
+    postcode: string | null
+  } | {
+    business_name: string
+    address_line_1: string | null
+    address_line_2: string | null
+    town_city: string | null
+    postcode: string | null
+  }[] | null
   takeaway_order_items: Array<{
     boxes: number
     bags_per_box: number
@@ -796,6 +819,31 @@ function runProgressStep(status: string) {
   return index >= 0 ? index : 0
 }
 
+const ORDER_PROGRESS = [
+  { key: 'shipping', label: 'Shipping paid' },
+  { key: 'submitted', label: 'Order submitted' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'dispatched', label: 'Dispatched' },
+  { key: 'completed', label: 'Complete' },
+] as const
+
+function bookingNeedsAction(booking: AccountBooking) {
+  return booking.artwork_review_status === 'changes_requested' || booking.artwork_review_status === 'rejected'
+}
+
+function orderNeedsAction(order: AccountOrder) {
+  return order.status === 'draft' && order.shipping_pence > 0 && !order.shipping_paid_at
+}
+
+function shortReference(prefix: string, id: string) {
+  return `${prefix}-${id.replaceAll('-', '').slice(0, 8).toUpperCase()}`
+}
+
+function formatAccountDate(value: string | null | undefined) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function App() {
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isAdminRoute = currentPath === '/admin'
@@ -838,6 +886,7 @@ export default function App() {
   const [paymentSuccessSales, setPaymentSuccessSales] = useState<{ sold: number; capacity: number } | null>(null)
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [accountTab, setAccountTab] = useState<'advertising' | 'orders'>('advertising')
   const [accountLoading, setAccountLoading] = useState(false)
   const [accountBookings, setAccountBookings] = useState<AccountBooking[]>([])
   const [accountArtworkUrls, setAccountArtworkUrls] = useState<Record<string, string>>({})
@@ -1345,12 +1394,20 @@ export default function App() {
             artwork_path,
             artwork_review_status,
             artwork_review_notes,
+            artwork_reviewed_at,
             panel,
+            top_row,
+            left_col,
+            width_cells,
+            height_cells,
             square_count,
             total_pence,
             reserved_until,
             paid_at,
             created_at,
+            stripe_checkout_session_id,
+            stripe_payment_intent_id,
+            payment_currency,
             production_runs (
               id,
               run_code,
@@ -1358,7 +1415,7 @@ export default function App() {
               status_updated_at,
               status_note,
               estimated_stage_date,
-              bag_sizes (name, total_square_count)
+              bag_sizes (name, total_square_count, square_size_mm)
             )
           `)
           .order('created_at', { ascending: false }),
@@ -1368,12 +1425,19 @@ export default function App() {
             id,
             status,
             created_at,
-            shipping_pence,
-            shipping_paid_at,
             submitted_at,
+            delivery_notes,
             shipping_pence,
             shipping_paid_at,
-            takeaway_businesses (business_name),
+            stripe_checkout_session_id,
+            stripe_payment_intent_id,
+            takeaway_businesses (
+              business_name,
+              address_line_1,
+              address_line_2,
+              town_city,
+              postcode
+            ),
             takeaway_order_items (
               boxes,
               bags_per_box,
@@ -3994,182 +4058,400 @@ export default function App() {
         </div>
       )}
 
-      {accountOpen && userId && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAccountOpen(false)}>
-          <section
-            className="checkout-modal account-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="My Freepack account"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <button className="modal-close" onClick={() => setAccountOpen(false)} aria-label="Close account">
-              <X size={20} />
-            </button>
+      {accountOpen && userId && (() => {
+        const advertising = [...accountBookings].sort((a, b) => {
+          const actionDiff = Number(bookingNeedsAction(b)) - Number(bookingNeedsAction(a))
+          return actionDiff || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        })
+        const orders = [...accountOrders].sort((a, b) => {
+          const actionDiff = Number(orderNeedsAction(b)) - Number(orderNeedsAction(a))
+          return actionDiff || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        })
+        const actionCount = advertising.filter(bookingNeedsAction).length + orders.filter(orderNeedsAction).length
 
-            <div className="checkout-icon"><UserRound size={22} /></div>
-            <p className="kicker">MY FREEPACK</p>
-            <div className="account-title-row">
-              <h2>Your account</h2>
-              <button
-                className="account-signout"
-                onClick={async () => {
-                  await supabase.auth.signOut()
-                  setAccountOpen(false)
-                }}
-              >
-                Sign out
+        return (
+          <div className="modal-backdrop account-backdrop" role="presentation" onMouseDown={() => setAccountOpen(false)}>
+            <section
+              className="checkout-modal account-modal account-modal-v2"
+              role="dialog"
+              aria-modal="true"
+              aria-label="My Freepack account"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <button className="modal-close" onClick={() => setAccountOpen(false)} aria-label="Close account">
+                <X size={20} />
               </button>
-            </div>
-            <p className="checkout-intro">Track your advertising bookings and free takeaway bag orders in one place.</p>
 
-            {accountLoading && <div className="account-loading">Loading your activity…</div>}
-            {accountError && <div className="auth-message">{accountError}</div>}
+              <header className="account-hero">
+                <div className="checkout-icon"><UserRound size={22} /></div>
+                <div className="account-hero-copy">
+                  <p className="kicker">MY FREEPACK</p>
+                  <div className="account-title-row">
+                    <h2>Your account</h2>
+                    <button
+                      className="account-signout"
+                      onClick={async () => {
+                        await supabase.auth.signOut()
+                        setAccountOpen(false)
+                      }}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                  <p>Track advertising, artwork, production and free packaging orders from one place.</p>
+                </div>
+              </header>
 
-            {!accountLoading && !accountError && (
-              <div className="account-sections">
-                <section className="account-section">
-                  <div className="account-section-heading">
-                    <WalletCards size={18} />
+              {actionCount > 0 && (
+                <div className="account-attention" role="status">
+                  <strong>{actionCount} item{actionCount === 1 ? '' : 's'} need your attention</strong>
+                  <span>Anything requiring action is shown first in each section.</span>
+                </div>
+              )}
+
+              <div className="account-tabs" role="tablist" aria-label="Account sections">
+                <button
+                  role="tab"
+                  aria-selected={accountTab === 'advertising'}
+                  className={accountTab === 'advertising' ? 'active' : ''}
+                  onClick={() => setAccountTab('advertising')}
+                >
+                  <WalletCards size={17} />
+                  <span>Advertising</span>
+                  <b>{accountBookings.length}</b>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={accountTab === 'orders'}
+                  className={accountTab === 'orders' ? 'active' : ''}
+                  onClick={() => setAccountTab('orders')}
+                >
+                  <PackageCheck size={17} />
+                  <span>Free packaging</span>
+                  <b>{accountOrders.length}</b>
+                </button>
+              </div>
+
+              {accountLoading && <div className="account-loading">Loading your activity…</div>}
+              {accountError && <div className="auth-message">{accountError}</div>}
+
+              {!accountLoading && !accountError && accountTab === 'advertising' && (
+                <section className="account-panel" role="tabpanel">
+                  <div className="account-panel-heading">
                     <div>
-                      <strong>Advertising</strong>
-                      <span>{accountBookings.length} booking{accountBookings.length === 1 ? '' : 's'}</span>
+                      <p className="kicker">ADVERTISING</p>
+                      <h3>Your campaigns</h3>
                     </div>
+                    <a className="button button-dark" href="/advertise" onClick={() => setAccountOpen(false)}>
+                      Book another advert
+                    </a>
                   </div>
 
-                  {accountBookings.length === 0 ? (
-                    <p className="account-empty">You haven’t booked any advertising space yet.</p>
+                  {advertising.length === 0 ? (
+                    <div className="account-empty-state">
+                      <Megaphone size={26} />
+                      <strong>No advertising bookings yet</strong>
+                      <p>Choose a live production run, select your space and upload your artwork.</p>
+                      <a className="button button-dark" href="/advertise" onClick={() => setAccountOpen(false)}>Start advertising</a>
+                    </div>
                   ) : (
-                    <div className="account-list">
-                      {accountBookings.map((booking) => {
+                    <div className="account-v2-list">
+                      {advertising.map((booking) => {
                         const runRelation = firstRelation(booking.production_runs)
                         const bagRelation = firstRelation(runRelation?.bag_sizes)
-                        const statusLabel = booking.status.replaceAll('_', ' ')
                         const runStatus = runRelation?.status ?? 'selling'
-                        const progressStep = runProgressStep(runStatus)
+                        const runStep = runProgressStep(runStatus)
                         const sales = runRelation ? accountRunSales[runRelation.id] : undefined
                         const capacity = bagRelation?.total_square_count ?? 0
                         const sold = sales?.sold ?? 0
                         const reserved = sales?.reserved ?? 0
                         const soldPercent = capacity > 0 ? Math.round((sold / capacity) * 100) : 0
+                        const squareSize = bagRelation?.square_size_mm ?? 30
+                        const printWidth = booking.width_cells * squareSize
+                        const printHeight = booking.height_cells * squareSize
+                        const needsAction = bookingNeedsAction(booking)
+                        const paid = Boolean(booking.paid_at) || booking.status === 'paid'
+                        const approved = booking.artwork_review_status === 'approved'
+                        const printingIndex = runProgressStep('sent_to_print')
+                        const shippingIndex = runProgressStep('shipping')
+                        const distributionIndex = runProgressStep('distributing')
+                        const completedIndex = runProgressStep('completed')
+                        const timeline = [
+                          {
+                            label: 'Paid',
+                            state: paid ? 'complete' : 'current',
+                          },
+                          {
+                            label: 'Artwork review',
+                            state: needsAction ? 'action' : approved ? 'complete' : paid ? 'current' : 'pending',
+                          },
+                          {
+                            label: 'Approved',
+                            state: approved ? 'complete' : 'pending',
+                          },
+                          {
+                            label: 'Printing',
+                            state: runStep >= shippingIndex ? 'complete' : runStep >= printingIndex ? 'current' : 'pending',
+                          },
+                          {
+                            label: 'Distribution',
+                            state: runStep >= completedIndex ? 'complete' : runStep >= distributionIndex ? 'current' : 'pending',
+                          },
+                        ] as const
 
                         return (
-                          <article className="advertiser-tracker" key={booking.id}>
-                            <div className="advertiser-tracker-head">
+                          <article className={`account-campaign-card ${needsAction ? 'needs-action' : ''}`} key={booking.id}>
+                            <div className="account-card-head">
                               <div>
-                                <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'}</strong>
-                                <span>{booking.panel} · {booking.square_count} square{booking.square_count === 1 ? '' : 's'} · £{(booking.total_pence / 100).toFixed(2)}</span>
-                              </div>
-                              <span className={`status-pill status-${booking.status}`}>{statusLabel}</span>
-                            </div>
-
-                            <div className={`artwork-review-card artwork-review-${booking.artwork_review_status}`}>
-                              <div>
-                                <strong>Artwork</strong>
-                                <span>{booking.artwork_review_status.replaceAll('_', ' ')}</span>
-                              </div>
-                              {booking.artwork_review_notes && <p>{booking.artwork_review_notes}</p>}
-                              {(booking.artwork_review_status === 'changes_requested' || booking.artwork_review_status === 'rejected') && (
-                                <label className="replacement-upload">
-                                  <input
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                                    hidden
-                                    disabled={replacementUploading === booking.id}
-                                    onChange={(event) => {
-                                      const file = event.target.files?.[0]
-                                      void uploadReplacementArtwork(booking, file)
-                                      event.currentTarget.value = ''
-                                    }}
-                                  />
-                                  <span className="button button-dark">
-                                    {replacementUploading === booking.id ? 'Uploading…' : 'Upload revised artwork'}
-                                  </span>
-                                </label>
-                              )}
-                              {booking.artwork_review_status === 'pending' && booking.artwork_path && (
-                                <small>Your latest artwork is waiting for FreePack review.</small>
-                              )}
-                              {booking.artwork_review_status === 'approved' && accountArtworkUrls[booking.id] && (
-                                <div className="account-artwork-preview">
-                                  <img
-                                    src={accountArtworkUrls[booking.id]}
-                                    alt={`Approved artwork for ${bagRelation?.name ?? 'bag'} ${runRelation?.run_code ?? 'run'}`}
-                                  />
+                                <div className="account-card-title-line">
+                                  <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'}</strong>
+                                  {needsAction && <span className="account-action-badge">Needs action</span>}
                                 </div>
-                              )}
-                              {booking.artwork_review_status === 'approved' && (
-                                <small>Approved for this production run.</small>
-                              )}
-                            </div>
-
-                            <div className="campaign-sales">
-                              <div className="campaign-sales-copy">
-                                <strong>{runStatus === 'selling' ? 'Recruiting advertisers' : 'Advertising sales'}</strong>
-                                <span>{sold} of {capacity || '—'} spaces sold{reserved ? ` · ${reserved} currently reserved` : ''}</span>
+                                <span>Reference {shortReference('FP-AD', booking.id)} · booked {formatAccountDate(booking.created_at)}</span>
                               </div>
-                              <strong>{capacity ? `${soldPercent}%` : '—'}</strong>
-                            </div>
-                            <div className="campaign-sales-bar">
-                              <i style={{ width: `${Math.min(100, soldPercent)}%` }} />
+                              <span className={`status-pill status-${booking.status}`}>{booking.status.replaceAll('_', ' ')}</span>
                             </div>
 
-                            {(runRelation?.status_note || runRelation?.estimated_stage_date) && (
-                              <div className="campaign-update">
-                                <strong>Latest update</strong>
-                                {runRelation.status_note && <span>{runRelation.status_note}</span>}
-                                {runRelation.estimated_stage_date && (
-                                  <small>Estimated date: {new Date(`${runRelation.estimated_stage_date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</small>
+                            <div className="account-campaign-main">
+                              <div className="account-artwork-column">
+                                <div className="account-artwork-large">
+                                  {accountArtworkUrls[booking.id] ? (
+                                    <img
+                                      src={accountArtworkUrls[booking.id]}
+                                      alt={`Artwork for ${bagRelation?.name ?? 'bag'} ${runRelation?.run_code ?? 'run'}`}
+                                    />
+                                  ) : (
+                                    <div className="account-artwork-placeholder"><ImagePlus size={24} /><span>Artwork preview unavailable</span></div>
+                                  )}
+                                </div>
+
+                                <div className={`account-artwork-status artwork-review-${booking.artwork_review_status}`}>
+                                  <div>
+                                    <strong>Artwork</strong>
+                                    <span>{booking.artwork_review_status.replaceAll('_', ' ')}</span>
+                                  </div>
+                                  {booking.artwork_review_notes && <p>{booking.artwork_review_notes}</p>}
+                                  {needsAction && (
+                                    <label className="replacement-upload">
+                                      <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                        hidden
+                                        disabled={replacementUploading === booking.id}
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0]
+                                          void uploadReplacementArtwork(booking, file)
+                                          event.currentTarget.value = ''
+                                        }}
+                                      />
+                                      <span className="button button-dark">
+                                        {replacementUploading === booking.id ? 'Uploading…' : 'Replace artwork'}
+                                      </span>
+                                    </label>
+                                  )}
+                                  {booking.artwork_review_status === 'pending' && <small>Waiting for FreePack review.</small>}
+                                  {approved && <small>Approved for this production run.</small>}
+                                </div>
+                              </div>
+
+                              <div className="account-campaign-details">
+                                <div className="account-facts">
+                                  <div>
+                                    <span>Placement</span>
+                                    <strong>{booking.panel.charAt(0).toUpperCase() + booking.panel.slice(1)} · rows {booking.top_row + 1}–{booking.top_row + booking.height_cells}, columns {booking.left_col + 1}–{booking.left_col + booking.width_cells}</strong>
+                                  </div>
+                                  <div>
+                                    <span>Print size</span>
+                                    <strong>{printWidth} × {printHeight} mm</strong>
+                                  </div>
+                                  <div>
+                                    <span>Spaces</span>
+                                    <strong>{booking.width_cells} × {booking.height_cells} · {booking.square_count} total</strong>
+                                  </div>
+                                  <div>
+                                    <span>Amount</span>
+                                    <strong>£{(booking.total_pence / 100).toFixed(2)} {paid ? 'paid' : ''}</strong>
+                                  </div>
+                                  <div>
+                                    <span>Payment date</span>
+                                    <strong>{formatAccountDate(booking.paid_at)}</strong>
+                                  </div>
+                                  <div>
+                                    <span>Payment reference</span>
+                                    <strong>{booking.stripe_payment_intent_id ? booking.stripe_payment_intent_id.slice(-12) : shortReference('FP-AD', booking.id)}</strong>
+                                  </div>
+                                </div>
+
+                                <div className="account-stage-timeline" aria-label="Campaign progress">
+                                  {timeline.map((step, index) => (
+                                    <div className={`account-stage ${step.state}`} key={step.label}>
+                                      <i>{step.state === 'complete' ? <Check size={12} /> : index + 1}</i>
+                                      <span>{step.label}</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {runStatus === 'selling' && (
+                                  <div className="campaign-sales account-sales">
+                                    <div className="campaign-sales-copy">
+                                      <strong>Advertiser recruitment</strong>
+                                      <span>{sold} of {capacity || '—'} spaces sold{reserved ? ` · ${reserved} reserved` : ''}</span>
+                                    </div>
+                                    <strong>{capacity ? `${soldPercent}%` : '—'}</strong>
+                                  </div>
                                 )}
+                                {runStatus === 'selling' && (
+                                  <div className="campaign-sales-bar"><i style={{ width: `${Math.min(100, soldPercent)}%` }} /></div>
+                                )}
+
+                                {(runRelation?.status_note || runRelation?.estimated_stage_date) && (
+                                  <div className="campaign-update">
+                                    <strong>Latest production update</strong>
+                                    {runRelation.status_note && <span>{runRelation.status_note}</span>}
+                                    {runRelation.estimated_stage_date && <small>Estimated date: {formatAccountDate(runRelation.estimated_stage_date)}</small>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {!accountLoading && !accountError && accountTab === 'orders' && (
+                <section className="account-panel" role="tabpanel">
+                  <div className="account-panel-heading">
+                    <div>
+                      <p className="kicker">FREE PACKAGING</p>
+                      <h3>Your bag orders</h3>
+                    </div>
+                    <a className="button button-dark" href="/bags" onClick={() => setAccountOpen(false)}>
+                      Order more bags
+                    </a>
+                  </div>
+
+                  {orders.length === 0 ? (
+                    <div className="account-empty-state">
+                      <ShoppingBag size={26} />
+                      <strong>No free packaging orders yet</strong>
+                      <p>Choose the bag sizes and number of boxes your business needs.</p>
+                      <a className="button button-dark" href="/bags" onClick={() => setAccountOpen(false)}>Order free bags</a>
+                    </div>
+                  ) : (
+                    <div className="account-v2-list">
+                      {orders.map((order) => {
+                        const business = firstRelation(order.takeaway_businesses)
+                        const boxCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
+                        const bagCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes * item.bags_per_box, 0)
+                        const needsAction = orderNeedsAction(order)
+                        const shippingPaid = order.shipping_pence === 0 || Boolean(order.shipping_paid_at)
+                        const statusRank: Record<string, number> = {
+                          draft: 0,
+                          submitted: 1,
+                          approved: 2,
+                          dispatching: 3,
+                          dispatched: 4,
+                          completed: 5,
+                          cancelled: -1,
+                        }
+                        const rank = statusRank[order.status] ?? 0
+                        const orderTimeline = ORDER_PROGRESS.map((step, index) => {
+                          let complete = false
+                          let current = false
+                          if (index === 0) {
+                            complete = shippingPaid
+                            current = !shippingPaid
+                          } else if (step.key === 'submitted') {
+                            complete = rank > 1
+                            current = rank === 1
+                          } else if (step.key === 'approved') {
+                            complete = rank > 2
+                            current = rank === 2
+                          } else if (step.key === 'dispatched') {
+                            complete = rank > 4
+                            current = rank === 3 || rank === 4
+                          } else if (step.key === 'completed') {
+                            complete = rank >= 5
+                            current = false
+                          }
+                          return { ...step, state: complete ? 'complete' : current ? 'current' : 'pending' }
+                        })
+                        const address = business
+                          ? [business.address_line_1, business.address_line_2, business.town_city, business.postcode].filter(Boolean).join(', ')
+                          : '—'
+
+                        return (
+                          <article className={`account-order-card ${needsAction ? 'needs-action' : ''}`} key={order.id}>
+                            <div className="account-card-head">
+                              <div>
+                                <div className="account-card-title-line">
+                                  <strong>{business?.business_name ?? 'Takeaway order'}</strong>
+                                  {needsAction && <span className="account-action-badge">Needs action</span>}
+                                </div>
+                                <span>Reference {shortReference('FP-BAG', order.id)} · {formatAccountDate(order.created_at)}</span>
+                              </div>
+                              <span className={`status-pill status-${order.status}`}>{order.status.replaceAll('_', ' ')}</span>
+                            </div>
+
+                            {needsAction && (
+                              <div className="account-order-action">
+                                <strong>Shipping payment is still required</strong>
+                                <span>This draft order will not be submitted until delivery has been paid.</span>
                               </div>
                             )}
 
-                            <div className="run-timeline" aria-label="Production progress">
-                              {RUN_PROGRESS.map((step, index) => {
-                                const complete = index < progressStep
-                                const current = index === progressStep
+                            <div className="account-facts account-order-facts">
+                              <div>
+                                <span>Packaging</span>
+                                <strong>{boxCount} box{boxCount === 1 ? '' : 'es'} · {bagCount.toLocaleString()} bags</strong>
+                              </div>
+                              <div>
+                                <span>Shipping</span>
+                                <strong>£{(order.shipping_pence / 100).toFixed(2)} · {shippingPaid ? 'paid' : 'payment due'}</strong>
+                              </div>
+                              <div>
+                                <span>Submitted</span>
+                                <strong>{formatAccountDate(order.submitted_at)}</strong>
+                              </div>
+                              <div>
+                                <span>Payment reference</span>
+                                <strong>{order.stripe_payment_intent_id ? order.stripe_payment_intent_id.slice(-12) : shortReference('FP-BAG', order.id)}</strong>
+                              </div>
+                              <div className="account-fact-wide">
+                                <span>Delivery address</span>
+                                <strong>{address}</strong>
+                              </div>
+                              {order.delivery_notes && (
+                                <div className="account-fact-wide">
+                                  <span>Delivery notes</span>
+                                  <strong>{order.delivery_notes}</strong>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="account-order-lines">
+                              {order.takeaway_order_items.map((item, index) => {
+                                const productionRun = firstRelation(item.production_runs)
+                                const bag = firstRelation(productionRun?.bag_sizes)
                                 return (
-                                  <div className={`run-step ${complete ? 'complete' : ''} ${current ? 'current' : ''}`} key={step.key}>
-                                    <i>{complete ? <Check size={11} /> : index + 1}</i>
-                                    <span>{step.label}</span>
+                                  <div key={`${order.id}-${index}`}>
+                                    <span>{bag?.name ?? 'Bag'} · {productionRun?.run_code ?? 'Run'}</span>
+                                    <strong>{item.boxes} box{item.boxes === 1 ? '' : 'es'} · {(item.boxes * item.bags_per_box).toLocaleString()} bags</strong>
                                   </div>
                                 )
                               })}
                             </div>
-                          </article>
-                        )
-                      })}
-                    </div>
-                  )}
-                </section>
 
-                <section className="account-section">
-                  <div className="account-section-heading">
-                    <PackageCheck size={18} />
-                    <div>
-                      <strong>Free bag orders</strong>
-                      <span>{accountOrders.length} order{accountOrders.length === 1 ? '' : 's'}</span>
-                    </div>
-                  </div>
-
-                  {accountOrders.length === 0 ? (
-                    <p className="account-empty">You haven’t submitted any free bag orders yet.</p>
-                  ) : (
-                    <div className="account-list">
-                      {accountOrders.map((order) => {
-                        const business = firstRelation(order.takeaway_businesses)
-                        const boxCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
-                        const bagCount = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes * item.bags_per_box, 0)
-
-                        return (
-                          <article className="account-item" key={order.id}>
-                            <div>
-                              <strong>{business?.business_name ?? 'Takeaway order'}</strong>
-                              <span>{boxCount} box{boxCount === 1 ? '' : 'es'} · {bagCount.toLocaleString()} bags</span>
-                            </div>
-                            <div className="account-item-right">
-                              <strong>£{(order.shipping_pence / 100).toFixed(2)} shipping</strong>
-                              <span className={`status-pill status-${order.status}`}>{order.status.replaceAll('_', ' ')}</span>
+                            <div className="account-stage-timeline order-timeline" aria-label="Order progress">
+                              {orderTimeline.map((step, index) => (
+                                <div className={`account-stage ${step.state}`} key={step.key}>
+                                  <i>{step.state === 'complete' ? <Check size={12} /> : index + 1}</i>
+                                  <span>{step.label}</span>
+                                </div>
+                              ))}
                             </div>
                           </article>
                         )
@@ -4177,11 +4459,11 @@ export default function App() {
                     </div>
                   )}
                 </section>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
+              )}
+            </section>
+          </div>
+        )
+      })()}
 
       {takeawayCheckoutOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setTakeawayCheckoutOpen(false)}>
