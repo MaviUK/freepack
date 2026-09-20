@@ -270,6 +270,8 @@ export default function Bag3D({
       powerPreference: 'high-performance',
     })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.domElement.setAttribute('aria-hidden', 'true')
+    renderer.domElement.tabIndex = -1
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -621,6 +623,14 @@ export default function Bag3D({
 
     const startX = bag.rotation.x
     const targetX = -0.12
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+    if (reduceMotion) {
+      bag.rotation.y = targetY
+      bag.rotation.x = targetX
+      return
+    }
+
     const duration = 360
     const startedAt = performance.now()
 
@@ -895,8 +905,12 @@ export default function Bag3D({
   }
 
   return (
-    <div className="bag3d-shell">
-      <div className="bag3d-canvas" ref={hostRef} />
+    <div
+      className="bag3d-shell"
+      role="group"
+      aria-label={`Interactive 3D bag preview. ${panels[activePanel].label} face selected.`}
+    >
+      <div className="bag3d-canvas" ref={hostRef} aria-hidden="true" />
 
       <button
         type="button"
@@ -931,8 +945,8 @@ export default function Bag3D({
         →
       </button>
 
-      <div className="bag3d-hint">
-        3cm advert units · tighter spacing around centred Freepack branding · drag to rotate · tap to select
+      <div className="bag3d-hint" aria-hidden="true">
+        Tap a space to select · swipe sideways or use arrows to rotate
       </div>
     </div>
   )
