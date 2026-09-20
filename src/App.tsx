@@ -368,6 +368,54 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
 
 type LegalPageKey = 'privacy' | 'terms' | 'advertiser-terms' | 'takeaway-terms' | 'cookies' | 'contact'
 
+const SEO_BY_PATH: Record<string, { title: string; description: string; index?: boolean }> = {
+  '/': {
+    title: 'FreePack | Free takeaway packaging funded by advertising',
+    description: 'FreePack gives takeaways free paper bags, funded by brands buying advertising space on shared production runs.',
+  },
+  '/bags': {
+    title: 'Free takeaway bags for food businesses | FreePack',
+    description: 'Order FreePack takeaway paper bags for £0. Choose available bag sizes and boxes, with any delivery charge shown before checkout.',
+  },
+  '/advertise': {
+    title: 'Advertise on takeaway bags | FreePack',
+    description: 'Buy advertising space on upcoming FreePack bag runs. Choose your exact position, upload artwork and reach customers through physical packaging.',
+  },
+  '/faq': {
+    title: 'FreePack FAQs | Free packaging and bag advertising',
+    description: 'Answers about FreePack free takeaway bags, advertising space, artwork approval, production runs, shipping and distribution.',
+  },
+  '/contact': {
+    title: 'Contact FreePack',
+    description: 'Contact FreePack about advertising, artwork, production runs or free takeaway packaging orders.',
+  },
+  '/privacy': {
+    title: 'Privacy notice | FreePack',
+    description: 'Read the FreePack privacy notice and how personal information is handled.',
+  },
+  '/terms': {
+    title: 'Website terms | FreePack',
+    description: 'Read the terms that apply when using the FreePack website.',
+  },
+  '/advertiser-terms': {
+    title: 'Advertiser terms | FreePack',
+    description: 'Terms for businesses purchasing advertising space on FreePack production runs.',
+  },
+  '/takeaway-terms': {
+    title: 'Free packaging terms | FreePack',
+    description: 'Terms for takeaway and food-service businesses ordering free packaging from FreePack.',
+  },
+  '/cookies': {
+    title: 'Cookies and storage | FreePack',
+    description: 'Information about cookies, browser storage and essential technologies used by FreePack.',
+  },
+  '/admin': {
+    title: 'FreePack Admin',
+    description: 'FreePack platform administration.',
+    index: false,
+  },
+}
+
 const FAQ_ITEMS = [
   {
     question: 'How can the bags be free?',
@@ -871,6 +919,39 @@ export default function App() {
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isAdminRoute = currentPath === '/admin'
   const adminOpen = isAdminRoute
+
+  useEffect(() => {
+    const seo = SEO_BY_PATH[currentPath] ?? SEO_BY_PATH['/']
+    const absoluteUrl = `https://freepack.co.uk${currentPath === '/' ? '/' : currentPath}`
+
+    document.title = seo.title
+
+    const setMeta = (selector: string, attribute: 'name' | 'property', key: string, content: string) => {
+      let tag = document.head.querySelector<HTMLMetaElement>(selector)
+      if (!tag) {
+        tag = document.createElement('meta')
+        tag.setAttribute(attribute, key)
+        document.head.appendChild(tag)
+      }
+      tag.setAttribute('content', content)
+    }
+
+    setMeta('meta[name="description"]', 'name', 'description', seo.description)
+    setMeta('meta[name="robots"]', 'name', 'robots', seo.index === false ? 'noindex,nofollow' : 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1')
+    setMeta('meta[property="og:title"]', 'property', 'og:title', seo.title)
+    setMeta('meta[property="og:description"]', 'property', 'og:description', seo.description)
+    setMeta('meta[property="og:url"]', 'property', 'og:url', absoluteUrl)
+    setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', seo.title)
+    setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', seo.description)
+
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')
+    if (!canonical) {
+      canonical = document.createElement('link')
+      canonical.rel = 'canonical'
+      document.head.appendChild(canonical)
+    }
+    canonical.href = absoluteUrl
+  }, [currentPath])
 
   const [runs, setRuns] = useState<BagRun[]>(BAG_RUNS)
   const [runsLoading, setRunsLoading] = useState(true)
