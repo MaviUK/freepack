@@ -320,6 +320,305 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value
 }
 
+type LegalPageKey = 'privacy' | 'terms' | 'advertiser-terms' | 'takeaway-terms' | 'cookies' | 'contact'
+
+function LegalPage({ page }: { page: LegalPageKey }) {
+  const details = (
+    <address className="legal-business-card">
+      <strong>Gavin Stevenson trading as FreePack</strong>
+      <span>Unit 9, Saba Industrial Park</span>
+      <span>16 Balloo Ave</span>
+      <span>Bangor BT19 7QT</span>
+      <a href="mailto:info@freepack.co.uk">info@freepack.co.uk</a>
+    </address>
+  )
+
+  if (page === 'contact') {
+    return (
+      <section className="legal-page shell">
+        <a className="page-back" href="/"><ArrowLeft size={16} /> Back to FreePack</a>
+        <div className="legal-hero">
+          <p className="kicker">CONTACT</p>
+          <h1>Talk to FreePack.</h1>
+          <p>Questions about advertising, artwork, production runs or free packaging orders are welcome.</p>
+        </div>
+        <div className="legal-layout">
+          <article className="legal-document">
+            <h2>Contact details</h2>
+            {details}
+            <h2>Email</h2>
+            <p><a href="mailto:info@freepack.co.uk">info@freepack.co.uk</a></p>
+            <p>For an existing booking or order, include your booking or order reference so we can find it quickly.</p>
+          </article>
+          <aside className="legal-side-note">
+            <strong>FreePack</strong>
+            <span>Free takeaway packaging funded by shared advertising.</span>
+          </aside>
+        </div>
+      </section>
+    )
+  }
+
+  if (page === 'privacy') {
+    return (
+      <section className="legal-page shell">
+        <a className="page-back" href="/"><ArrowLeft size={16} /> Back to FreePack</a>
+        <div className="legal-hero">
+          <p className="kicker">PRIVACY</p>
+          <h1>Privacy notice.</h1>
+          <p>How we collect, use and protect personal information when you use FreePack.</p>
+          <small>Last updated 20 September 2026</small>
+        </div>
+        <div className="legal-layout">
+          <article className="legal-document">
+            <h2>1. Who is responsible for your information</h2>
+            <p>FreePack is the trading name of Gavin Stevenson, a sole trader. Gavin Stevenson is the data controller for personal information processed through freepack.co.uk and the FreePack service.</p>
+            {details}
+
+            <h2>2. Information we collect</h2>
+            <p>Depending on how you use FreePack, we may collect your name, email address, telephone number, business name, business address, delivery address, account information, packaging order details, advertising booking details, artwork files, messages you send us, and technical or security information connected with your use of the site.</p>
+            <p>When you pay through Stripe, Stripe processes your payment details. FreePack receives payment status, transaction references and limited payment metadata, but does not receive or store your full card number.</p>
+
+            <h2>3. Why we use your information</h2>
+            <p>We use personal information to create and secure accounts, reserve advertising space, process payments, review artwork, manage production runs, fulfil packaging orders, arrange delivery, send service and order updates, prevent misuse, resolve support requests, keep business records and comply with legal obligations.</p>
+            <p>Our lawful bases may include performing a contract or taking steps at your request before entering one, complying with legal obligations, our legitimate interests in operating and improving FreePack, and consent where consent is required.</p>
+
+            <h2>4. Emails and service messages</h2>
+            <p>We may send transactional emails needed to operate your account, booking or order, including payment, artwork, production and delivery updates. Marketing messages are treated separately and, where the law requires it, are only sent with an appropriate lawful basis or consent.</p>
+
+            <h2>5. Who we share information with</h2>
+            <p>We use specialist service providers to operate FreePack. These currently include Supabase for database, authentication and storage services; Stripe for payment processing; Resend for email delivery; and Netlify for website hosting and deployment. We only share information that is reasonably necessary for those services.</p>
+            <p>We may also disclose information where required by law, to professional advisers, or where reasonably necessary to protect FreePack, our users or others from fraud, abuse or security threats.</p>
+
+            <h2>6. International processing</h2>
+            <p>Some service providers may process information outside the UK. Where UK data protection law requires safeguards for an international transfer, we rely on the safeguards made available by the relevant provider and applicable UK data protection rules.</p>
+
+            <h2>7. How long we keep information</h2>
+            <p>We keep information only for as long as reasonably necessary for the purpose it was collected, including operating accounts, completing bookings and orders, handling disputes, and meeting tax, accounting and legal record-keeping requirements. Artwork and production records may be retained where needed to evidence what was approved and printed.</p>
+
+            <h2>8. Your rights</h2>
+            <p>Depending on the circumstances, you may have rights to access, correct, erase, restrict or object to the use of your personal information, and to receive certain information in a portable format. Where processing is based on consent, you can withdraw that consent.</p>
+            <p>To exercise a privacy right, email <a href="mailto:info@freepack.co.uk">info@freepack.co.uk</a>. You also have the right to complain to the UK Information Commissioner's Office at <a href="https://ico.org.uk" target="_blank" rel="noreferrer">ico.org.uk</a>.</p>
+
+            <h2>9. Security</h2>
+            <p>We use reasonable technical and organisational measures designed to protect personal information. No online service can guarantee absolute security, so you should keep your password confidential and contact us promptly if you believe your account has been compromised.</p>
+
+            <h2>10. Changes to this notice</h2>
+            <p>We may update this notice as FreePack changes. The current version will always be published on this page with its latest update date.</p>
+          </article>
+          <aside className="legal-side-note">
+            <strong>Your privacy contact</strong>
+            <a href="mailto:info@freepack.co.uk">info@freepack.co.uk</a>
+            <span>FreePack is operated by Gavin Stevenson as a sole trader.</span>
+          </aside>
+        </div>
+      </section>
+    )
+  }
+
+  if (page === 'cookies') {
+    return (
+      <section className="legal-page shell">
+        <a className="page-back" href="/"><ArrowLeft size={16} /> Back to FreePack</a>
+        <div className="legal-hero">
+          <p className="kicker">COOKIES & STORAGE</p>
+          <h1>Cookies and browser storage.</h1>
+          <p>What the FreePack website stores on your device and why.</p>
+          <small>Last updated 20 September 2026</small>
+        </div>
+        <div className="legal-layout">
+          <article className="legal-document">
+            <h2>1. Essential storage</h2>
+            <p>FreePack uses browser storage and session information that is necessary to provide features you ask for, including account sign-in, authentication, security and keeping your session working. This may include local storage or similar browser technologies rather than traditional cookies.</p>
+
+            <h2>2. Payments</h2>
+            <p>When you choose to pay, you are redirected to Stripe's hosted checkout. Stripe may use cookies or similar technologies that are necessary for secure payment processing, fraud prevention and the operation of its checkout service. Stripe's own privacy and cookie information applies on its service.</p>
+
+            <h2>3. Analytics and advertising cookies</h2>
+            <p>FreePack does not currently place non-essential analytics or behavioural advertising cookies on freepack.co.uk. If we introduce non-essential analytics, advertising or other tracking technologies in the future, we will update this notice and introduce an appropriate consent control before those technologies are used where consent is required.</p>
+
+            <h2>4. Controlling storage</h2>
+            <p>You can remove stored website data through your browser settings. Removing essential authentication storage may sign you out or stop account features from working until you sign in again.</p>
+
+            <h2>5. Questions</h2>
+            <p>If you have questions about cookies or browser storage used by FreePack, email <a href="mailto:info@freepack.co.uk">info@freepack.co.uk</a>.</p>
+          </article>
+          <aside className="legal-side-note">
+            <strong>Current position</strong>
+            <span>Essential account and security storage only on freepack.co.uk. No FreePack analytics or behavioural advertising cookies are currently installed.</span>
+          </aside>
+        </div>
+      </section>
+    )
+  }
+
+  if (page === 'advertiser-terms') {
+    return (
+      <section className="legal-page shell">
+        <a className="page-back" href="/advertise"><ArrowLeft size={16} /> Back to advertising</a>
+        <div className="legal-hero">
+          <p className="kicker">ADVERTISER TERMS</p>
+          <h1>Advertising with FreePack.</h1>
+          <p>Terms for businesses buying advertising space on FreePack production runs.</p>
+          <small>Last updated 20 September 2026</small>
+        </div>
+        <div className="legal-layout">
+          <article className="legal-document">
+            <h2>1. Who these terms are for</h2>
+            <p>These terms apply when a business purchases advertising space through FreePack. FreePack is operated by Gavin Stevenson trading as FreePack, a sole trader.</p>
+
+            <h2>2. Production runs and advertising space</h2>
+            <p>Advertising is sold against a particular bag size and production run. The selectable advertising grid is divided into 3 cm × 3 cm units. You may purchase one unit or multiple adjoining units, subject to availability and the layout shown at the time of reservation.</p>
+            <p>The price per unit is the price displayed for that production run before you reserve and pay. A space is not secured until the booking has been successfully paid for.</p>
+
+            <h2>3. Artwork</h2>
+            <p>You are responsible for supplying suitable artwork and for ensuring you have all rights, licences and permissions needed for any names, logos, photographs, trademarks, claims or other material in it.</p>
+            <p>Artwork is subject to FreePack review. We may approve it, request reasonable changes, or reject material that is unlawful, misleading, infringing, discriminatory, obscene, unsafe, technically unsuitable for print, or otherwise likely to damage FreePack, participating takeaways or other advertisers.</p>
+            <p>You grant FreePack a non-exclusive licence to store, reproduce, resize and place the supplied artwork as reasonably necessary to produce, print, display and distribute the relevant bags and to administer your booking.</p>
+
+            <h2>4. Position and print tolerances</h2>
+            <p>We aim to print your advert in the selected area and at the purchased grid size. Printing, cutting, folding, colour reproduction and bag manufacturing involve normal production tolerances, so small differences in colour, alignment, scale or position are not treated as a failure to supply the advertising service.</p>
+            <p>If a material production change means we cannot reasonably provide the purchased area, we will contact you and offer an appropriate alternative, credit or refund.</p>
+
+            <h2>5. Timing and distribution</h2>
+            <p>Production and distribution dates shown on the site are estimates unless we expressly agree otherwise in writing. They can change because of artwork, manufacturing, shipping, stock or other operational issues.</p>
+            <p>FreePack does not guarantee that bags will reach any specific person, location or number of individual end customers, or that an advert will generate a particular number of enquiries, sales, impressions or other commercial result.</p>
+
+            <h2>6. Cancellations and refunds</h2>
+            <p>Advertising space is reserved specifically against a production run and capacity is removed from sale once paid. Business bookings do not have an automatic consumer cooling-off right. If you want to cancel, contact us as soon as possible. Any refund outside a FreePack cancellation or service failure will depend on the stage reached and costs or capacity already committed.</p>
+            <p>If FreePack cancels a production run and cannot provide a reasonable replacement, we will offer an appropriate alternative, account credit or refund for the affected advertising booking.</p>
+
+            <h2>7. Your responsibilities</h2>
+            <p>You must provide accurate account and business information, keep your account secure, respond to artwork requests within a reasonable time, and not use FreePack to promote unlawful goods, services or content.</p>
+
+            <h2>8. Liability</h2>
+            <p>Nothing in these terms excludes liability that cannot legally be excluded. Subject to that, FreePack is not responsible for indirect or consequential business losses, loss of profit, loss of anticipated sales, or the performance of your advertising campaign. Our aggregate liability arising from a particular paid advertising booking will not exceed the amount you paid for that booking, except where the law does not allow that limitation.</p>
+
+            <h2>9. Governing law</h2>
+            <p>These terms and any dispute relating to a business advertising booking are governed by the laws of Northern Ireland, and the courts of Northern Ireland will have jurisdiction, unless mandatory law requires otherwise.</p>
+
+            <h2>10. Contact</h2>
+            {details}
+          </article>
+          <aside className="legal-side-note">
+            <strong>Before you buy</strong>
+            <span>Check the run, bag face, selected size, artwork and total price before payment.</span>
+            <a href="/privacy">Privacy notice</a>
+          </aside>
+        </div>
+      </section>
+    )
+  }
+
+  if (page === 'takeaway-terms') {
+    return (
+      <section className="legal-page shell">
+        <a className="page-back" href="/bags"><ArrowLeft size={16} /> Back to free bags</a>
+        <div className="legal-hero">
+          <p className="kicker">FREE PACKAGING TERMS</p>
+          <h1>Free bags for food businesses.</h1>
+          <p>Terms for takeaways and other eligible food businesses ordering FreePack stock.</p>
+          <small>Last updated 20 September 2026</small>
+        </div>
+        <div className="legal-layout">
+          <article className="legal-document">
+            <h2>1. Business use</h2>
+            <p>FreePack's free packaging service is intended for genuine takeaway, food-service and similar business use. We may ask for information needed to verify the business before approving or dispatching an order.</p>
+
+            <h2>2. The bags</h2>
+            <p>The bags themselves are supplied at £0.00. They carry a shared FreePack design containing advertising from brands that have funded the relevant production run. They are not custom-printed for each takeaway.</p>
+            <p>Bag sizes, stock levels, box quantities and available production runs are shown on the site. Images and dimensions are provided to help you choose, but minor manufacturing tolerances may apply.</p>
+
+            <h2>3. Shipping</h2>
+            <p>A shipping charge may apply even though the bags are free. The shipping amount is shown before you place the order and, where payment is required, must be paid through the checkout before the order is submitted for fulfilment.</p>
+            <p>Delivery dates are estimates unless expressly agreed otherwise. We are not responsible for delays caused by carriers or events outside our reasonable control, but we will work with you to resolve delivery issues.</p>
+
+            <h2>4. Order approval and fair allocation</h2>
+            <p>Submitting an order does not guarantee allocation. Orders are subject to business verification, stock availability, production timing and fair allocation between participating businesses. We may reduce, refuse or cancel an order where quantities are unreasonable, information cannot be verified, stock is unavailable, or the service is being misused.</p>
+
+            <h2>5. Use and resale</h2>
+            <p>Free bags are provided for normal packaging use within the ordering business. They must not be resold as stock, removed from circulation for speculative purposes, or used in a way intended to defeat the shared-advertising model.</p>
+
+            <h2>6. Problems with an order</h2>
+            <p>Contact us promptly if an order arrives damaged, materially incorrect or incomplete. Please include your order reference and, where useful, photographs so we can investigate.</p>
+
+            <h2>7. Liability</h2>
+            <p>Nothing in these terms excludes liability that cannot legally be excluded. Subject to that, FreePack is not responsible for indirect or consequential business losses arising from stock availability, delivery delay or use of the free bags.</p>
+
+            <h2>8. Governing law</h2>
+            <p>These terms and any dispute relating to a business packaging order are governed by the laws of Northern Ireland, and the courts of Northern Ireland will have jurisdiction, unless mandatory law requires otherwise.</p>
+
+            <h2>9. Contact</h2>
+            {details}
+          </article>
+          <aside className="legal-side-note">
+            <strong>Simple pricing</strong>
+            <span>The bags cost £0.00. Any delivery charge is shown separately before you order.</span>
+            <a href="/privacy">Privacy notice</a>
+          </aside>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="legal-page shell">
+      <a className="page-back" href="/"><ArrowLeft size={16} /> Back to FreePack</a>
+      <div className="legal-hero">
+        <p className="kicker">WEBSITE TERMS</p>
+        <h1>Terms of use.</h1>
+        <p>Terms for using freepack.co.uk, creating an account and using FreePack online services.</p>
+        <small>Last updated 20 September 2026</small>
+      </div>
+      <div className="legal-layout">
+        <article className="legal-document">
+          <h2>1. About FreePack</h2>
+          <p>FreePack is the trading name of Gavin Stevenson, a sole trader. These terms apply to use of freepack.co.uk and the online services made available through it.</p>
+          {details}
+
+          <h2>2. Using the website</h2>
+          <p>You may use the website for lawful purposes and in accordance with these terms. You must not attempt to interfere with the site, gain unauthorised access, misuse another person's account, introduce malicious code, scrape the service in a way that harms its operation, or use it for fraudulent or unlawful activity.</p>
+
+          <h2>3. Accounts</h2>
+          <p>You are responsible for providing accurate information and keeping your sign-in credentials secure. Tell us promptly if you believe an account has been accessed without permission. We may suspend access where reasonably necessary for security, fraud prevention, legal compliance or serious breach of these terms.</p>
+
+          <h2>4. Separate transaction terms</h2>
+          <p>Advertising bookings are also subject to our <a href="/advertiser-terms">Advertiser Terms</a>. Free packaging orders are also subject to our <a href="/takeaway-terms">Free Packaging Terms</a>. If there is a conflict about a specific transaction, the applicable transaction terms take priority for that transaction.</p>
+
+          <h2>5. Website information</h2>
+          <p>We try to keep information accurate and current, but production dates, availability and operational information may change. Content on the website is general information and is not professional, legal, financial or marketing advice.</p>
+
+          <h2>6. Intellectual property</h2>
+          <p>The FreePack name, website design, software, copy, graphics and other FreePack-owned content are protected by applicable intellectual-property rights. You may use the website for normal business purposes but may not copy or commercially exploit FreePack-owned material without permission.</p>
+          <p>Advertisers retain ownership of their own artwork and grant the limited rights described in the Advertiser Terms.</p>
+
+          <h2>7. Availability</h2>
+          <p>We may update, suspend or change parts of the website from time to time. We do not guarantee uninterrupted availability, but we will take reasonable steps to keep core services operating.</p>
+
+          <h2>8. Liability</h2>
+          <p>Nothing in these terms excludes liability that cannot legally be excluded. To the extent permitted by law, we are not responsible for indirect or consequential business losses caused by use of the website itself. Specific liability rules for advertising bookings and packaging orders are set out in the relevant transaction terms.</p>
+
+          <h2>9. Privacy</h2>
+          <p>Our <a href="/privacy">Privacy Notice</a> explains how we use personal information. Our <a href="/cookies">Cookies & Storage Notice</a> explains the browser storage and related technologies used by the site.</p>
+
+          <h2>10. Changes</h2>
+          <p>We may update these terms where the service or applicable rules change. The latest version will be published here. Changes do not retrospectively alter a completed transaction unless required by law or agreed with you.</p>
+
+          <h2>11. Governing law</h2>
+          <p>These terms are governed by the laws of Northern Ireland. For business users, the courts of Northern Ireland will have jurisdiction unless mandatory law requires otherwise. If you use FreePack as a consumer, nothing in these terms removes any statutory rights or jurisdiction rights that cannot lawfully be restricted.</p>
+        </article>
+        <aside className="legal-side-note">
+          <strong>Related terms</strong>
+          <a href="/advertiser-terms">Advertiser Terms</a>
+          <a href="/takeaway-terms">Free Packaging Terms</a>
+          <a href="/privacy">Privacy Notice</a>
+          <a href="/cookies">Cookies & Storage</a>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
 function gridCount(widthMm: number, heightMm: number) {
   const cols = Math.floor((widthMm - 20 + 3) / 33)
   const rows = Math.floor((heightMm - 20 + 3) / 33)
@@ -2352,8 +2651,23 @@ export default function App() {
     setReservationLoading(false)
   }
 
+  const legalPage: LegalPageKey | null =
+    currentPath === '/privacy'
+      ? 'privacy'
+      : currentPath === '/terms'
+        ? 'terms'
+        : currentPath === '/advertiser-terms'
+          ? 'advertiser-terms'
+          : currentPath === '/takeaway-terms'
+            ? 'takeaway-terms'
+            : currentPath === '/cookies'
+              ? 'cookies'
+              : currentPath === '/contact'
+                ? 'contact'
+                : null
+
   const publicPage: 'home' | 'bags' | 'advertise' | null =
-    isAdminRoute
+    isAdminRoute || legalPage
       ? null
       : currentPath === '/bags'
         ? 'bags'
@@ -2811,6 +3125,8 @@ export default function App() {
           </section>
         </>
       )}
+
+      {legalPage && <LegalPage page={legalPage} />}
 
       {isAdminRoute && (
         <div className="admin-app">
@@ -3702,6 +4018,10 @@ export default function App() {
 
                 {takeawayMessage && <div className="auth-message">{takeawayMessage}</div>}
 
+                <p className="transaction-terms-note">
+                  By placing this order, you agree to the <a href="/takeaway-terms" target="_blank" rel="noreferrer">Free Packaging Terms</a> and <a href="/terms" target="_blank" rel="noreferrer">Website Terms</a>.
+                </p>
+
                 <button className="button button-dark modal-primary" disabled={takeawaySubmitting}>
                   {takeawaySubmitting
                     ? 'Processing…'
@@ -3918,8 +4238,11 @@ export default function App() {
             </div>
 
             <div className="checkout-notice">
-              Your selected cells are reserved while you complete checkout. Stripe handles the card payment securely; Freepack never receives your card details.
+              Your selected cells are reserved while you complete checkout. Stripe handles the card payment securely; FreePack never receives your card details.
             </div>
+            <p className="transaction-terms-note">
+              By reserving and paying, you agree to the <a href="/advertiser-terms" target="_blank" rel="noreferrer">Advertiser Terms</a> and <a href="/terms" target="_blank" rel="noreferrer">Website Terms</a>.
+            </p>
 
             {reservationMessage && (
               <div className={`reservation-message ${activeBookingId ? 'success' : ''}`}>
@@ -3952,15 +4275,50 @@ export default function App() {
         </div>
       )}
 
-      <footer className="shell site-footer">
-        <a className="footer-brand" href="#" aria-label="Freepack home">
-          <img src="/freepack-logo-navy.svg" alt="Freepack" />
-        </a>
-        <div className="footer-copy">
-          <strong>Good packaging goes further.</strong>
-          <span>Free takeaway packaging. Paid for by advertising.</span>
-        </div>
-      </footer>
+      {!isAdminRoute && (
+        <footer className="shell site-footer site-footer-expanded">
+          <div className="footer-primary">
+            <a className="footer-brand" href="/" aria-label="FreePack home">
+              <img src="/freepack-logo-navy.svg" alt="FreePack" />
+            </a>
+            <div className="footer-copy">
+              <strong>Good packaging goes further.</strong>
+              <span>Free takeaway packaging. Paid for by advertising.</span>
+            </div>
+            <p className="footer-business">
+              FreePack is the trading name of Gavin Stevenson, sole trader.<br />
+              Unit 9, Saba Industrial Park, 16 Balloo Ave, Bangor BT19 7QT.
+            </p>
+          </div>
+
+          <div className="footer-links">
+            <div>
+              <strong>Explore</strong>
+              <a href="/">Who we are</a>
+              <a href="/bags">Free bags</a>
+              <a href="/advertise">Advertise</a>
+            </div>
+            <div>
+              <strong>Legal</strong>
+              <a href="/terms">Website Terms</a>
+              <a href="/advertiser-terms">Advertiser Terms</a>
+              <a href="/takeaway-terms">Free Packaging Terms</a>
+              <a href="/privacy">Privacy Notice</a>
+              <a href="/cookies">Cookies & Storage</a>
+            </div>
+            <div>
+              <strong>Contact</strong>
+              <a href="/contact">Contact FreePack</a>
+              <a href="mailto:info@freepack.co.uk">info@freepack.co.uk</a>
+            </div>
+          </div>
+
+          <div className="footer-bottom">
+            <span>© {new Date().getFullYear()} Gavin Stevenson trading as FreePack.</span>
+            <span>Bangor, Northern Ireland.</span>
+          </div>
+        </footer>
+      )}
     </main>
   )
 }
