@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { AD_CELL_MM as CELL_MM, SAFE_MARGIN_MM, panelLayout, placementRectMm } from './bagLayout'
 
 export type BagPanelKey = 'front' | 'right' | 'back' | 'left'
 export type BagPoint = { row: number; col: number }
@@ -48,125 +49,6 @@ type OverlayFace = {
 }
 
 const PANEL_ORDER: BagPanelKey[] = ['front', 'right', 'back', 'left']
-const CELL_MM = 30
-const GAP_MM = 3
-const SAFE_MARGIN_MM = 10
-const VERTICAL_EDGE_MARGIN_MM = 6
-const BRAND_TO_AD_GAP_MM = 3
-
-function panelLayout(
-  config: BagPanelConfig,
-  heightMm: number,
-  brandRows: number[] = [],
-  brandGapAfterRow: number | null = null,
-) {
-  const horizontalGapMm = config.cols <= 1
-    ? 0
-    : config.cols === 6 && config.widthMm <= 200
-      ? 1
-      : Math.min(
-          GAP_MM,
-          Math.max(
-            0,
-            (config.widthMm - SAFE_MARGIN_MM * 2 - config.cols * CELL_MM) / (config.cols - 1),
-          ),
-        )
-  const stepXmm = CELL_MM + horizontalGapMm
-  const gridWidthMm = config.cols * CELL_MM + Math.max(0, config.cols - 1) * horizontalGapMm
-  const offsetXmm = config.cols === 6 && config.widthMm <= 200
-    ? Math.max(0, (config.widthMm - gridWidthMm) / 2)
-    : Math.max(SAFE_MARGIN_MM, (config.widthMm - gridWidthMm) / 2)
-  const rowYmm = Array.from({ length: config.rows }, () => 0)
-
-  if (!brandRows.length && brandGapAfterRow === null) {
-    const gridHeightMm = config.rows * CELL_MM + Math.max(0, config.rows - 1) * GAP_MM
-    const offsetYmm = Math.max(VERTICAL_EDGE_MARGIN_MM, (heightMm - gridHeightMm) / 2)
-    for (let row = 0; row < config.rows; row += 1) {
-      rowYmm[row] = offsetYmm + row * (CELL_MM + GAP_MM)
-    }
-
-    return {
-      gridWidthMm,
-      gridHeightMm,
-      offsetXmm,
-      offsetYmm,
-      stepMm: stepXmm,
-      horizontalGapMm,
-      rowYmm,
-      brandZoneTopMm: null as number | null,
-      brandZoneHeightMm: 0,
-    }
-  }
-
-  const sortedBrandRows = [...brandRows].sort((a, b) => a - b)
-  const brandZoneHeightMm = sortedBrandRows.length > 1 ? 48 : 22
-  const brandZoneTopMm = (heightMm - brandZoneHeightMm) / 2
-  const brandZoneBottomMm = brandZoneTopMm + brandZoneHeightMm
-
-  let topRows: number[]
-  let bottomRows: number[]
-
-  if (sortedBrandRows.length) {
-    const firstBrandRow = sortedBrandRows[0]
-    const lastBrandRow = sortedBrandRows[sortedBrandRows.length - 1]
-    topRows = Array.from({ length: firstBrandRow }, (_, index) => index)
-    bottomRows = Array.from(
-      { length: config.rows - lastBrandRow - 1 },
-      (_, index) => lastBrandRow + 1 + index,
-    )
-  } else {
-    const splitAfter = Math.max(0, Math.min(config.rows - 2, brandGapAfterRow ?? 0))
-    topRows = Array.from({ length: splitAfter + 1 }, (_, index) => index)
-    bottomRows = Array.from(
-      { length: config.rows - splitAfter - 1 },
-      (_, index) => splitAfter + 1 + index,
-    )
-  }
-
-  function fitGap(rowCount: number, availableHeight: number) {
-    if (rowCount <= 1) return 0
-    return Math.min(
-      GAP_MM,
-      Math.max(0, (availableHeight - rowCount * CELL_MM) / (rowCount - 1)),
-    )
-  }
-
-  if (topRows.length) {
-    const topEndMm = brandZoneTopMm - BRAND_TO_AD_GAP_MM
-    const availableHeight = topEndMm - VERTICAL_EDGE_MARGIN_MM
-    const gap = fitGap(topRows.length, availableHeight)
-    const blockHeight = topRows.length * CELL_MM + (topRows.length - 1) * gap
-    const startMm = topEndMm - blockHeight
-
-    topRows.forEach((row, index) => {
-      rowYmm[row] = startMm + index * (CELL_MM + gap)
-    })
-  }
-
-  if (bottomRows.length) {
-    const bottomStartMm = brandZoneBottomMm + BRAND_TO_AD_GAP_MM
-    const availableHeight = heightMm - VERTICAL_EDGE_MARGIN_MM - bottomStartMm
-    const gap = fitGap(bottomRows.length, availableHeight)
-
-    bottomRows.forEach((row, index) => {
-      rowYmm[row] = bottomStartMm + index * (CELL_MM + gap)
-    })
-  }
-
-  const visibleRows = rowYmm.filter((_, row) => !sortedBrandRows.includes(row))
-
-  return {
-    gridWidthMm,
-    gridHeightMm: heightMm - VERTICAL_EDGE_MARGIN_MM * 2,
-    offsetXmm,
-    offsetYmm: visibleRows.length ? Math.min(...visibleRows) : VERTICAL_EDGE_MARGIN_MM,
-    stepMm: stepXmm,
-      horizontalGapMm,
-    rowYmm,
-    brandZoneTopMm,
-    brandZoneHeightMm,
-  }
-}
 
 function cellKey(row: number, col: number) {
   return `${row}-${col}`
@@ -792,14 +674,17 @@ export default function Bag3D({
           const sponsorImage = sponsorImages.get(sponsor.id)
           if (!sponsorImage?.complete || !sponsorImage.naturalWidth || !sponsorImage.naturalHeight) continue
 
-          const x = originX + sponsor.leftCol * stepX
-          const sponsorBottomRow = sponsor.topRow + sponsor.heightCells - 1
-          const yMm = layout.rowYmm[sponsor.topRow]
-          const bottomMm = layout.rowYmm[sponsorBottomRow] + CELL_MM
-          const y = yMm * pxPerMmY
-          const widthMm = sponsor.widthCells * CELL_MM + Math.max(0, sponsor.widthCells - 1) * layout.horizontalGapMm
-          const width = widthMm * pxPerMmX
-          const height = (bottomMm - yMm) * pxPerMmY
+          const sponsorRect = placementRectMm(
+            layout,
+            sponsor.topRow,
+            sponsor.leftCol,
+            sponsor.widthCells,
+            sponsor.heightCells,
+          )
+          const x = sponsorRect.xMm * pxPerMmX
+          const y = sponsorRect.yMm * pxPerMmY
+          const width = sponsorRect.widthMm * pxPerMmX
+          const height = sponsorRect.heightMm * pxPerMmY
 
           ctx.save()
           drawContainedImage(
@@ -818,14 +703,17 @@ export default function Bag3D({
         }
 
         if (panel === activePanel && selection) {
-          const selectedCols = selection.right - selection.left + 1
-          const x = originX + selection.left * stepX
-          const selectionTopMm = layout.rowYmm[selection.top]
-          const selectionBottomMm = layout.rowYmm[selection.bottom] + CELL_MM
-          const y = selectionTopMm * pxPerMmY
-          const widthMm = selectedCols * CELL_MM + Math.max(0, selectedCols - 1) * layout.horizontalGapMm
-          const width = widthMm * pxPerMmX
-          const height = (selectionBottomMm - selectionTopMm) * pxPerMmY
+          const selectionRect = placementRectMm(
+            layout,
+            selection.top,
+            selection.left,
+            selection.right - selection.left + 1,
+            selection.bottom - selection.top + 1,
+          )
+          const x = selectionRect.xMm * pxPerMmX
+          const y = selectionRect.yMm * pxPerMmY
+          const width = selectionRect.widthMm * pxPerMmX
+          const height = selectionRect.heightMm * pxPerMmY
 
           // One advertiser gets one continuous rectangle: no internal 3mm gaps.
           // Never paint a background behind advertiser artwork. Transparent
