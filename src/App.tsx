@@ -407,6 +407,10 @@ function runProgressStep(status: string) {
 }
 
 export default function App() {
+  const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
+  const isAdminRoute = currentPath === '/admin'
+  const adminOpen = isAdminRoute
+
   const [runs, setRuns] = useState<BagRun[]>(BAG_RUNS)
   const [runsLoading, setRunsLoading] = useState(true)
   const [runId, setRunId] = useState('L-001')
@@ -428,6 +432,7 @@ export default function App() {
   const [authMessage, setAuthMessage] = useState('')
   const [authReturnTo, setAuthReturnTo] = useState<'advertiser' | 'takeaway' | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [artworkFile, setArtworkFile] = useState<File | null>(null)
   const [reservationLoading, setReservationLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
@@ -449,7 +454,9 @@ export default function App() {
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
   const [accountError, setAccountError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [adminOpen, setAdminOpen] = useState(false)
+  const [adminSection, setAdminSection] = useState<'overview' | 'advertising' | 'artwork' | 'production' | 'orders'>('overview')
+  const [adminSearch, setAdminSearch] = useState('')
+  const [adminBookingFilter, setAdminBookingFilter] = useState('all')
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminMessage, setAdminMessage] = useState('')
   const [adminBookings, setAdminBookings] = useState<AdminBooking[]>([])
@@ -581,6 +588,7 @@ export default function App() {
 
       if (!id) {
         setIsAdmin(false)
+        setAuthChecked(true)
         return
       }
 
@@ -591,6 +599,7 @@ export default function App() {
         .maybeSingle()
 
       setIsAdmin(profile?.account_type === 'admin')
+      setAuthChecked(true)
     }
 
     syncAuthState()
@@ -2190,23 +2199,24 @@ export default function App() {
     setReservationLoading(false)
   }
 
-  const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
-  const publicPage: 'home' | 'bags' | 'advertise' =
-    currentPath === '/bags'
-      ? 'bags'
-      : currentPath === '/advertise'
-        ? 'advertise'
-        : 'home'
+  const publicPage: 'home' | 'bags' | 'advertise' | null =
+    isAdminRoute
+      ? null
+      : currentPath === '/bags'
+        ? 'bags'
+        : currentPath === '/advertise'
+          ? 'advertise'
+          : 'home'
 
   return (
-    <main>
-      {paymentBanner && (
+    <main className={isAdminRoute ? 'admin-route' : undefined}>
+      {!isAdminRoute && paymentBanner && (
         <div className="payment-banner">
           <span>{paymentBanner}</span>
           <button onClick={() => setPaymentBanner('')} aria-label="Dismiss payment message"><X size={16} /></button>
         </div>
       )}
-      <header className="nav shell">
+      {!isAdminRoute && <header className="nav shell">
         <a className="brand" href="/" aria-label="Freepack home">
           <img src="/freepack-logo-white.svg" alt="Freepack" />
         </a>
@@ -2218,9 +2228,9 @@ export default function App() {
         {userId ? (
           <div className="nav-actions">
             {isAdmin && (
-              <button className="button button-light admin-nav-button" onClick={() => setAdminOpen(true)}>
+              <a className="button button-light admin-nav-button" href="/admin">
                 Admin
-              </button>
+              </a>
             )}
             <button className="button button-dark" onClick={() => setAccountOpen(true)}>
               My account
@@ -2231,7 +2241,7 @@ export default function App() {
             Sign in
           </button>
         )}
-      </header>
+      </header>}
 
       {publicPage === 'home' && (
         <>
@@ -2641,201 +2651,464 @@ export default function App() {
         </>
       )}
 
-      {adminOpen && isAdmin && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAdminOpen(false)}>
-          <section
-            className="checkout-modal admin-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Freepack admin"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <button className="modal-close" onClick={() => setAdminOpen(false)} aria-label="Close admin">
-              <X size={20} />
-            </button>
+      {isAdminRoute && (
+        <div className="admin-app">
+          <aside className="admin-sidebar">
+            <a className="admin-brand" href="/" aria-label="Freepack home">
+              <img src="/freepack-logo-white.svg" alt="Freepack" />
+            </a>
 
-            <div className="checkout-icon"><ShieldCheck size={22} /></div>
-            <p className="kicker">PLATFORM ADMIN</p>
-            <h2>Freepack control room</h2>
-            <p className="checkout-intro">Approve artwork, progress takeaway orders and move production runs through the workflow.</p>
+            <div className="admin-sidebar-label">PLATFORM ADMIN</div>
+            <nav className="admin-nav">
+              <button className={adminSection === 'overview' ? 'active' : ''} onClick={() => setAdminSection('overview')}>
+                <ShieldCheck size={18} /> Overview
+              </button>
+              <button className={adminSection === 'advertising' ? 'active' : ''} onClick={() => setAdminSection('advertising')}>
+                <Megaphone size={18} /> Advertising
+              </button>
+              <button className={adminSection === 'artwork' ? 'active' : ''} onClick={() => setAdminSection('artwork')}>
+                <ImagePlus size={18} /> Artwork
+                {adminBookings.filter((booking) => booking.status === 'paid' && booking.artwork_review_status === 'pending').length > 0 && (
+                  <span>{adminBookings.filter((booking) => booking.status === 'paid' && booking.artwork_review_status === 'pending').length}</span>
+                )}
+              </button>
+              <button className={adminSection === 'production' ? 'active' : ''} onClick={() => setAdminSection('production')}>
+                <Box size={18} /> Production
+              </button>
+              <button className={adminSection === 'orders' ? 'active' : ''} onClick={() => setAdminSection('orders')}>
+                <Truck size={18} /> Takeaway orders
+                {adminOrders.filter((order) => order.status === 'submitted').length > 0 && (
+                  <span>{adminOrders.filter((order) => order.status === 'submitted').length}</span>
+                )}
+              </button>
+            </nav>
 
-            {adminLoading && <div className="account-loading">Loading live platform data…</div>}
-            {adminMessage && <div className="auth-message">{adminMessage}</div>}
+            <div className="admin-sidebar-footer">
+              <a href="/"><ArrowLeft size={16} /> Back to website</a>
+              {userId && (
+                <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/' }}>
+                  Sign out
+                </button>
+              )}
+            </div>
+          </aside>
 
-            {!adminLoading && (
-              <div className="admin-sections">
-                <section className="admin-section">
-                  <div className="account-section-heading">
-                    <ImagePlus size={18} />
-                    <div>
-                      <strong>Artwork review</strong>
-                      <span>{adminBookings.filter((booking) => booking.artwork_review_status === 'pending').length} pending</span>
-                    </div>
-                  </div>
-
-                  <div className="admin-list">
-                    {adminBookings.length === 0 && <p className="account-empty">No advertising bookings yet.</p>}
-                    {adminBookings.map((booking) => {
-                      const runRelation = firstRelation(booking.production_runs)
-                      const bagRelation = firstRelation(runRelation?.bag_sizes)
-                      const profile = firstRelation(booking.profiles)
-
-                      return (
-                        <article className="admin-item" key={booking.id}>
-                          {adminArtworkUrls[booking.id] ? (
-                            <img src={adminArtworkUrls[booking.id]} alt="Advertiser artwork" />
-                          ) : (
-                            <div className="admin-art-placeholder">No preview</div>
-                          )}
-                          <div className="admin-item-copy">
-                            <strong>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'} · {booking.panel}</strong>
-                            <span>{profile?.display_name ?? 'Advertiser'} · {booking.square_count} squares · £{(booking.total_pence / 100).toFixed(2)}</span>
-                            <span className={`status-pill status-${booking.artwork_review_status}`}>{booking.artwork_review_status.replaceAll('_', ' ')}</span>
-                            {booking.artwork_review_notes && <small>{booking.artwork_review_notes}</small>}
-                          </div>
-                          <div className="admin-actions">
-                            <button onClick={() => updateArtworkReview(booking.id, 'approved')}>Approve</button>
-                            <button onClick={() => updateArtworkReview(booking.id, 'changes_requested')}>Changes</button>
-                            <button onClick={() => updateArtworkReview(booking.id, 'rejected')}>Reject</button>
-                          </div>
-                        </article>
-                      )
-                    })}
-                  </div>
-                </section>
-
-                <section className="admin-section">
-                  <div className="account-section-heading">
-                    <Truck size={18} />
-                    <div>
-                      <strong>Takeaway orders</strong>
-                      <span>{adminOrders.length} total</span>
-                    </div>
-                  </div>
-
-                  <div className="admin-list compact">
-                    {adminOrders.length === 0 && <p className="account-empty">No takeaway orders yet.</p>}
-                    {adminOrders.map((order) => {
-                      const business = firstRelation(order.takeaway_businesses)
-                      const boxes = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
-
-                      return (
-                        <article className="admin-item order-admin-item" key={order.id}>
-                          <div className="admin-item-copy">
-                            <strong>{business?.business_name ?? 'Takeaway'}</strong>
-                            <span>{business?.postcode ?? 'No postcode'} · {boxes} box{boxes === 1 ? '' : 'es'}</span>
-                          </div>
-                          <select value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value as any)}>
-                            <option value="submitted">Submitted</option>
-                            <option value="approved">Approved</option>
-                            <option value="dispatching">Dispatching</option>
-                            <option value="dispatched">Dispatched</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </article>
-                      )
-                    })}
-                  </div>
-                </section>
-
-                <section className="admin-section">
-                  <div className="account-section-heading">
-                    <Box size={18} />
-                    <div>
-                      <strong>Production runs</strong>
-                      <span>{adminRuns.length} runs</span>
-                    </div>
-                  </div>
-
-                  <div className="admin-list compact">
-                    {adminRuns.map((item) => {
-                      const bag = firstRelation(item.bag_sizes)
-                      const sales = adminRunSales[item.id] ?? { sold: 0, reserved: 0 }
-                      const capacity = bag?.total_square_count ?? 0
-                      const soldPercent = capacity > 0 ? Math.round((sales.sold / capacity) * 100) : 0
-                      const stage = RUN_PROGRESS.find((step) => step.key === item.status)?.label ?? item.status.replaceAll('_', ' ')
-                      const paidBookings = adminBookings.filter((booking) =>
-                        firstRelation(booking.production_runs)?.id === item.id && booking.status === 'paid',
-                      )
-                      const approvedArtwork = paidBookings.filter((booking) =>
-                        booking.artwork_review_status === 'approved' && Boolean(booking.artwork_path),
-                      )
-                      const artworkOutstanding = Math.max(0, paidBookings.length - approvedArtwork.length)
-                      const printReady = paidBookings.length > 0 && artworkOutstanding === 0
-
-                      return (
-                        <article className="admin-campaign-item" key={item.id}>
-                          <div className="admin-campaign-head">
-                            <div className="admin-item-copy">
-                              <strong>{bag?.name ?? 'Bag'} · {item.run_code}</strong>
-                              <span>{stage} · £{(item.price_per_square_pence / 100).toFixed(2)} / square</span>
-                            </div>
-                            <strong>{capacity ? `${soldPercent}% sold` : '—'}</strong>
-                          </div>
-
-                          <div className="admin-campaign-sales">
-                            <span>{sales.sold} sold · {sales.reserved} reserved · {capacity || '—'} total spaces</span>
-                            <div className="campaign-sales-bar">
-                              <i style={{ width: `${Math.min(100, soldPercent)}%` }} />
-                            </div>
-                          </div>
-
-                          <div className={`print-readiness ${printReady ? 'ready' : 'blocked'}`}>
-                            <div>
-                              <strong>{printReady ? 'Ready for print' : 'Not ready for print'}</strong>
-                              <span>
-                                {paidBookings.length
-                                  ? `${approvedArtwork.length} of ${paidBookings.length} paid artwork file${paidBookings.length === 1 ? '' : 's'} approved`
-                                  : 'No paid advertiser artwork yet'}
-                              </span>
-                            </div>
-                            <span>{printReady ? <Check size={14} /> : artworkOutstanding || '—'}</span>
-                          </div>
-
-                          <div className="admin-campaign-controls">
-                            <label>
-                              Campaign stage
-                              <select value={item.status} onChange={(event) => updateRunStatus(item.id, event.target.value as any)}>
-                                <option value="selling">Recruiting advertisers</option>
-                                <option value="funded">Advertising sold</option>
-                                <option value="artwork_review">Artwork approval</option>
-                                <option value="sent_to_print" disabled={!printReady}>Sent for print</option>
-                                <option value="printing" disabled={!printReady}>Printing</option>
-                                <option value="shipping" disabled={!printReady}>Shipping</option>
-                                <option value="in_stock" disabled={!printReady}>In stock</option>
-                                <option value="distributing" disabled={!printReady}>Distribution</option>
-                                <option value="completed" disabled={!printReady}>Completed</option>
-                              </select>
-                            </label>
-                            <div className="admin-campaign-actions">
-                              <button className="button button-light" onClick={() => updateRunDetails(item)}>
-                                Update advertiser message
-                              </button>
-                              <button
-                                className="button button-dark"
-                                disabled={adminExportingRun === item.id || !printReady}
-                                title={printReady ? 'Download approved artwork and placement manifest' : 'Approve all paid advertiser artwork first'}
-                                onClick={() => void exportProductionPack(item)}
-                              >
-                                <Download size={14} />
-                                {adminExportingRun === item.id ? 'Building pack…' : 'Export artwork pack'}
-                              </button>
-                            </div>
-                          </div>
-
-                          {(item.status_note || item.estimated_stage_date) && (
-                            <div className="admin-campaign-note">
-                              {item.status_note && <span>{item.status_note}</span>}
-                              {item.estimated_stage_date && <small>Estimated: {item.estimated_stage_date}</small>}
-                            </div>
-                          )}
-                        </article>
-                      )
-                    })}
-                  </div>
-                </section>
+          <section className="admin-workspace">
+            <header className="admin-topbar">
+              <div>
+                <p>FREEPACK ADMIN</p>
+                <h1>
+                  {adminSection === 'overview' && 'Overview'}
+                  {adminSection === 'advertising' && 'Advertising'}
+                  {adminSection === 'artwork' && 'Artwork approval'}
+                  {adminSection === 'production' && 'Production'}
+                  {adminSection === 'orders' && 'Takeaway orders'}
+                </h1>
               </div>
+              <a className="admin-site-link" href="/">View website <ArrowRight size={15} /></a>
+            </header>
+
+            {!authChecked && (
+              <div className="admin-state-card">Checking admin access…</div>
+            )}
+
+            {authChecked && !userId && (
+              <div className="admin-gate">
+                <div className="checkout-icon"><ShieldCheck size={24} /></div>
+                <p className="kicker">ADMIN ACCESS</p>
+                <h2>Sign in to Freepack Admin</h2>
+                <p>Use your administrator account to continue.</p>
+                <button className="button button-dark" onClick={() => { setAuthMode('signin'); setAuthReturnTo(null); setAuthOpen(true) }}>
+                  Sign in
+                </button>
+              </div>
+            )}
+
+            {authChecked && userId && !isAdmin && (
+              <div className="admin-gate">
+                <div className="checkout-icon"><ShieldCheck size={24} /></div>
+                <p className="kicker">ADMIN ACCESS</p>
+                <h2>This account is not an administrator.</h2>
+                <p>Return to the Freepack website or sign in with an admin account.</p>
+                <a className="button button-dark" href="/">Back to website</a>
+              </div>
+            )}
+
+            {authChecked && userId && isAdmin && (
+              <>
+                {adminMessage && (
+                  <div className="admin-message">
+                    <span>{adminMessage}</span>
+                    <button onClick={() => setAdminMessage('')} aria-label="Dismiss"><X size={15} /></button>
+                  </div>
+                )}
+
+                {adminLoading ? (
+                  <div className="admin-state-card">Loading live platform data…</div>
+                ) : (
+                  <>
+                    {adminSection === 'overview' && (() => {
+                      const paidBookings = adminBookings.filter((booking) => booking.status === 'paid')
+                      const pendingArtwork = paidBookings.filter((booking) => booking.artwork_review_status === 'pending')
+                      const submittedOrders = adminOrders.filter((order) => order.status === 'submitted')
+                      const revenuePence = paidBookings.reduce((sum, booking) => sum + booking.total_pence, 0)
+                      const soldSpaces = Object.values(adminRunSales).reduce((sum, sales) => sum + sales.sold, 0)
+                      const printReadyRuns = adminRuns.filter((item) => {
+                        const runBookings = paidBookings.filter((booking) => firstRelation(booking.production_runs)?.id === item.id)
+                        return runBookings.length > 0 && runBookings.every((booking) => booking.artwork_review_status === 'approved' && Boolean(booking.artwork_path))
+                      })
+
+                      return (
+                        <div className="admin-page-stack">
+                          <section className="admin-summary-grid">
+                            <article>
+                              <span>Revenue received</span>
+                              <strong>£{(revenuePence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                              <small>{paidBookings.length} paid booking{paidBookings.length === 1 ? '' : 's'}</small>
+                            </article>
+                            <article>
+                              <span>Ad spaces sold</span>
+                              <strong>{soldSpaces}</strong>
+                              <small>Across {adminRuns.length} production run{adminRuns.length === 1 ? '' : 's'}</small>
+                            </article>
+                            <article className={pendingArtwork.length ? 'attention' : ''}>
+                              <span>Artwork to review</span>
+                              <strong>{pendingArtwork.length}</strong>
+                              <small>{pendingArtwork.length ? 'Needs your attention' : 'Nothing waiting'}</small>
+                            </article>
+                            <article className={submittedOrders.length ? 'attention' : ''}>
+                              <span>Orders waiting</span>
+                              <strong>{submittedOrders.length}</strong>
+                              <small>{submittedOrders.length ? 'Awaiting approval' : 'Nothing waiting'}</small>
+                            </article>
+                          </section>
+
+                          <section className="admin-panel">
+                            <div className="admin-panel-head">
+                              <div>
+                                <p className="kicker">NEEDS ATTENTION</p>
+                                <h2>What needs doing now</h2>
+                              </div>
+                            </div>
+                            <div className="admin-attention-list">
+                              {pendingArtwork.length > 0 && (
+                                <button onClick={() => setAdminSection('artwork')}>
+                                  <span className="admin-attention-icon"><ImagePlus size={18} /></span>
+                                  <div><strong>{pendingArtwork.length} artwork approval{pendingArtwork.length === 1 ? '' : 's'}</strong><small>Review advertiser artwork before production.</small></div>
+                                  <ArrowRight size={17} />
+                                </button>
+                              )}
+                              {submittedOrders.length > 0 && (
+                                <button onClick={() => setAdminSection('orders')}>
+                                  <span className="admin-attention-icon"><Truck size={18} /></span>
+                                  <div><strong>{submittedOrders.length} takeaway order{submittedOrders.length === 1 ? '' : 's'} waiting</strong><small>Approve or update the order status.</small></div>
+                                  <ArrowRight size={17} />
+                                </button>
+                              )}
+                              {printReadyRuns.length > 0 && (
+                                <button onClick={() => setAdminSection('production')}>
+                                  <span className="admin-attention-icon"><PackageCheck size={18} /></span>
+                                  <div><strong>{printReadyRuns.length} production run{printReadyRuns.length === 1 ? '' : 's'} ready for print</strong><small>All paid artwork is approved and exportable.</small></div>
+                                  <ArrowRight size={17} />
+                                </button>
+                              )}
+                              {pendingArtwork.length === 0 && submittedOrders.length === 0 && printReadyRuns.length === 0 && (
+                                <div className="admin-all-clear">
+                                  <Check size={20} />
+                                  <div><strong>You're all caught up</strong><small>There are no urgent admin tasks right now.</small></div>
+                                </div>
+                              )}
+                            </div>
+                          </section>
+
+                          <section className="admin-panel">
+                            <div className="admin-panel-head">
+                              <div>
+                                <p className="kicker">PRODUCTION</p>
+                                <h2>Active runs</h2>
+                              </div>
+                              <button onClick={() => setAdminSection('production')}>Manage production <ArrowRight size={15} /></button>
+                            </div>
+                            <div className="admin-run-overview">
+                              {adminRuns.map((item) => {
+                                const bag = firstRelation(item.bag_sizes)
+                                const sales = adminRunSales[item.id] ?? { sold: 0, reserved: 0 }
+                                const capacity = bag?.total_square_count ?? 0
+                                const soldPercent = capacity > 0 ? Math.round((sales.sold / capacity) * 100) : 0
+                                const stage = RUN_PROGRESS.find((step) => step.key === item.status)?.label ?? item.status.replaceAll('_', ' ')
+                                return (
+                                  <article key={item.id}>
+                                    <div><strong>{bag?.name ?? 'Bag'}</strong><span>{item.run_code}</span></div>
+                                    <div className="admin-run-meta"><span>{stage}</span><strong>{soldPercent}% sold</strong></div>
+                                    <div className="campaign-sales-bar"><i style={{ width: `${Math.min(100, soldPercent)}%` }} /></div>
+                                    <small>{sales.sold} sold · {sales.reserved} reserved · {capacity} total</small>
+                                  </article>
+                                )
+                              })}
+                            </div>
+                          </section>
+                        </div>
+                      )
+                    })()}
+
+                    {adminSection === 'advertising' && (() => {
+                      const query = adminSearch.trim().toLowerCase()
+                      const filteredBookings = adminBookings.filter((booking) => {
+                        const runRelation = firstRelation(booking.production_runs)
+                        const bagRelation = firstRelation(runRelation?.bag_sizes)
+                        const profile = firstRelation(booking.profiles)
+                        const matchesFilter = adminBookingFilter === 'all' || booking.status === adminBookingFilter
+                        const haystack = [profile?.display_name, runRelation?.run_code, bagRelation?.name, booking.panel, booking.id].filter(Boolean).join(' ').toLowerCase()
+                        return matchesFilter && (!query || haystack.includes(query))
+                      })
+
+                      return (
+                        <div className="admin-page-stack">
+                          <section className="admin-panel">
+                            <div className="admin-panel-head admin-filter-head">
+                              <div>
+                                <p className="kicker">ADVERTISING</p>
+                                <h2>Purchases & bookings</h2>
+                                <span>{filteredBookings.length} result{filteredBookings.length === 1 ? '' : 's'}</span>
+                              </div>
+                              <div className="admin-filters">
+                                <input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search advertiser, run or booking…" />
+                                <select value={adminBookingFilter} onChange={(event) => setAdminBookingFilter(event.target.value)}>
+                                  <option value="all">All statuses</option>
+                                  <option value="paid">Paid</option>
+                                  <option value="reserved">Reserved</option>
+                                  <option value="cancelled">Cancelled</option>
+                                  <option value="expired">Expired</option>
+                                  <option value="refunded">Refunded</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {filteredBookings.length === 0 ? (
+                              <p className="admin-empty">No advertising bookings match these filters.</p>
+                            ) : (
+                              <div className="admin-table-wrap">
+                                <table className="admin-table">
+                                  <thead><tr><th>Advertiser</th><th>Run</th><th>Placement</th><th>Amount</th><th>Payment</th><th>Artwork</th><th>Date</th></tr></thead>
+                                  <tbody>
+                                    {filteredBookings.map((booking) => {
+                                      const runRelation = firstRelation(booking.production_runs)
+                                      const bagRelation = firstRelation(runRelation?.bag_sizes)
+                                      const profile = firstRelation(booking.profiles)
+                                      return (
+                                        <tr key={booking.id}>
+                                          <td><strong>{profile?.display_name ?? 'Advertiser'}</strong><small>#{booking.id.slice(0, 8).toUpperCase()}</small></td>
+                                          <td><strong>{bagRelation?.name ?? 'Bag'}</strong><small>{runRelation?.run_code ?? 'Run'}</small></td>
+                                          <td><strong>{booking.height_cells} × {booking.width_cells}</strong><small>{booking.panel} · {booking.square_count} squares</small></td>
+                                          <td><strong>£{(booking.total_pence / 100).toFixed(2)}</strong></td>
+                                          <td><span className={`admin-status admin-status-${booking.status}`}>{booking.status.replaceAll('_', ' ')}</span></td>
+                                          <td><span className={`admin-status admin-status-${booking.artwork_review_status}`}>{booking.artwork_review_status.replaceAll('_', ' ')}</span></td>
+                                          <td><small>{new Date(booking.created_at).toLocaleDateString('en-GB')}</small></td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                      )
+                    })()}
+
+                    {adminSection === 'artwork' && (() => {
+                      const artworkBookings = [...adminBookings]
+                        .filter((booking) => booking.status === 'paid' && Boolean(booking.artwork_path))
+                        .sort((a, b) => Number(a.artwork_review_status !== 'pending') - Number(b.artwork_review_status !== 'pending'))
+
+                      return (
+                        <div className="admin-page-stack">
+                          <section className="admin-panel">
+                            <div className="admin-panel-head">
+                              <div>
+                                <p className="kicker">ARTWORK</p>
+                                <h2>Review advertiser artwork</h2>
+                                <span>{artworkBookings.filter((booking) => booking.artwork_review_status === 'pending').length} pending approval</span>
+                              </div>
+                            </div>
+
+                            {artworkBookings.length === 0 ? (
+                              <p className="admin-empty">There is no paid advertiser artwork to review yet.</p>
+                            ) : (
+                              <div className="admin-artwork-grid">
+                                {artworkBookings.map((booking) => {
+                                  const runRelation = firstRelation(booking.production_runs)
+                                  const bagRelation = firstRelation(runRelation?.bag_sizes)
+                                  const profile = firstRelation(booking.profiles)
+                                  return (
+                                    <article className={`admin-artwork-card ${booking.artwork_review_status === 'pending' ? 'pending' : ''}`} key={booking.id}>
+                                      <div className="admin-artwork-preview">
+                                        {adminArtworkUrls[booking.id]
+                                          ? <img src={adminArtworkUrls[booking.id]} alt="Advertiser artwork" />
+                                          : <div>No preview available</div>}
+                                      </div>
+                                      <div className="admin-artwork-body">
+                                        <div className="admin-artwork-title">
+                                          <div>
+                                            <strong>{profile?.display_name ?? 'Advertiser'}</strong>
+                                            <span>{bagRelation?.name ?? 'Bag'} · {runRelation?.run_code ?? 'Run'} · {booking.panel}</span>
+                                          </div>
+                                          <span className={`admin-status admin-status-${booking.artwork_review_status}`}>{booking.artwork_review_status.replaceAll('_', ' ')}</span>
+                                        </div>
+                                        <div className="admin-artwork-facts">
+                                          <span><small>Space</small><strong>{booking.height_cells} × {booking.width_cells}</strong></span>
+                                          <span><small>Squares</small><strong>{booking.square_count}</strong></span>
+                                          <span><small>Paid</small><strong>£{(booking.total_pence / 100).toFixed(2)}</strong></span>
+                                        </div>
+                                        {booking.artwork_review_notes && <p className="admin-review-note">{booking.artwork_review_notes}</p>}
+                                        <div className="admin-artwork-actions">
+                                          <button className="approve" onClick={() => updateArtworkReview(booking.id, 'approved')}><Check size={15} /> Approve</button>
+                                          <button onClick={() => updateArtworkReview(booking.id, 'changes_requested')}>Request changes</button>
+                                          <button className="reject" onClick={() => updateArtworkReview(booking.id, 'rejected')}>Reject</button>
+                                        </div>
+                                      </div>
+                                    </article>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                      )
+                    })()}
+
+                    {adminSection === 'production' && (
+                      <div className="admin-page-stack">
+                        <section className="admin-panel">
+                          <div className="admin-panel-head">
+                            <div>
+                              <p className="kicker">PRODUCTION</p>
+                              <h2>Production runs</h2>
+                              <span>Move each bag run through advertising, artwork and print.</span>
+                            </div>
+                          </div>
+
+                          <div className="admin-production-grid">
+                            {adminRuns.map((item) => {
+                              const bag = firstRelation(item.bag_sizes)
+                              const sales = adminRunSales[item.id] ?? { sold: 0, reserved: 0 }
+                              const capacity = bag?.total_square_count ?? 0
+                              const soldPercent = capacity > 0 ? Math.round((sales.sold / capacity) * 100) : 0
+                              const stage = RUN_PROGRESS.find((step) => step.key === item.status)?.label ?? item.status.replaceAll('_', ' ')
+                              const paidBookings = adminBookings.filter((booking) =>
+                                firstRelation(booking.production_runs)?.id === item.id && booking.status === 'paid',
+                              )
+                              const approvedArtwork = paidBookings.filter((booking) =>
+                                booking.artwork_review_status === 'approved' && Boolean(booking.artwork_path),
+                              )
+                              const artworkOutstanding = Math.max(0, paidBookings.length - approvedArtwork.length)
+                              const printReady = paidBookings.length > 0 && artworkOutstanding === 0
+
+                              return (
+                                <article className="admin-production-card" key={item.id}>
+                                  <div className="admin-production-title">
+                                    <div><strong>{bag?.name ?? 'Bag'}</strong><span>{item.run_code}</span></div>
+                                    <span className={`admin-status ${printReady ? 'admin-status-approved' : 'admin-status-pending'}`}>
+                                      {printReady ? 'Print ready' : `${artworkOutstanding} artwork pending`}
+                                    </span>
+                                  </div>
+                                  <div className="admin-production-sales">
+                                    <div><span>{stage}</span><strong>{soldPercent}% sold</strong></div>
+                                    <div className="campaign-sales-bar"><i style={{ width: `${Math.min(100, soldPercent)}%` }} /></div>
+                                    <small>{sales.sold} sold · {sales.reserved} reserved · {capacity} total spaces</small>
+                                  </div>
+                                  <div className="admin-production-controls">
+                                    <label>
+                                      Current stage
+                                      <select value={item.status} onChange={(event) => updateRunStatus(item.id, event.target.value as any)}>
+                                        <option value="selling">Recruiting advertisers</option>
+                                        <option value="funded">Advertising sold</option>
+                                        <option value="artwork_review">Artwork approval</option>
+                                        <option value="sent_to_print" disabled={!printReady}>Sent for print</option>
+                                        <option value="printing" disabled={!printReady}>Printing</option>
+                                        <option value="shipping" disabled={!printReady}>Shipping</option>
+                                        <option value="in_stock" disabled={!printReady}>In stock</option>
+                                        <option value="distributing" disabled={!printReady}>Distribution</option>
+                                        <option value="completed" disabled={!printReady}>Completed</option>
+                                      </select>
+                                    </label>
+                                  </div>
+                                  <div className="admin-production-actions">
+                                    <button onClick={() => updateRunDetails(item)}>Update advertiser message</button>
+                                    <button
+                                      className="primary"
+                                      disabled={adminExportingRun === item.id || !printReady}
+                                      onClick={() => void exportProductionPack(item)}
+                                    >
+                                      <Download size={15} /> {adminExportingRun === item.id ? 'Building pack…' : 'Export print pack'}
+                                    </button>
+                                  </div>
+                                  {(item.status_note || item.estimated_stage_date) && (
+                                    <div className="admin-production-note">
+                                      {item.status_note && <span>{item.status_note}</span>}
+                                      {item.estimated_stage_date && <small>Estimated: {item.estimated_stage_date}</small>}
+                                    </div>
+                                  )}
+                                </article>
+                              )
+                            })}
+                          </div>
+                        </section>
+                      </div>
+                    )}
+
+                    {adminSection === 'orders' && (
+                      <div className="admin-page-stack">
+                        <section className="admin-panel">
+                          <div className="admin-panel-head">
+                            <div>
+                              <p className="kicker">TAKEAWAYS</p>
+                              <h2>Free bag orders</h2>
+                              <span>{adminOrders.length} order{adminOrders.length === 1 ? '' : 's'} in total</span>
+                            </div>
+                          </div>
+
+                          {adminOrders.length === 0 ? (
+                            <p className="admin-empty">No takeaway orders yet.</p>
+                          ) : (
+                            <div className="admin-table-wrap">
+                              <table className="admin-table">
+                                <thead><tr><th>Business</th><th>Postcode</th><th>Boxes</th><th>Bags</th><th>Ordered</th><th>Status</th></tr></thead>
+                                <tbody>
+                                  {adminOrders.map((order) => {
+                                    const business = firstRelation(order.takeaway_businesses)
+                                    const boxes = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes, 0)
+                                    const bags = order.takeaway_order_items.reduce((sum, item) => sum + item.boxes * item.bags_per_box, 0)
+                                    return (
+                                      <tr key={order.id}>
+                                        <td><strong>{business?.business_name ?? 'Takeaway'}</strong><small>#{order.id.slice(0, 8).toUpperCase()}</small></td>
+                                        <td>{business?.postcode ?? '—'}</td>
+                                        <td><strong>{boxes}</strong></td>
+                                        <td>{bags.toLocaleString('en-GB')}</td>
+                                        <td><small>{new Date(order.created_at).toLocaleDateString('en-GB')}</small></td>
+                                        <td>
+                                          <select className="admin-order-select" value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value as any)}>
+                                            <option value="submitted">Submitted</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="dispatching">Dispatching</option>
+                                            <option value="dispatched">Dispatched</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="cancelled">Cancelled</option>
+                                          </select>
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </section>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </section>
         </div>
