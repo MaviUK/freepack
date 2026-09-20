@@ -1,0 +1,16 @@
+{
+  "name": "FreePack",
+  "short_name": "FreePack",
+  "description": "Free takeaway packaging funded by advertising.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F2EB",
+  "theme_color": "#0E2A47",
+  "icons": [
+    {
+      "src": "/freepack-logo-navy.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
