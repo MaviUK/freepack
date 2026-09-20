@@ -6207,3 +6207,21 @@ summary:focus-visible {
     animation-iteration-count:1 !important;
   }
 }
+
+
+/* Give the 3D bag extra black space below on phones so the down arrow does not cover the bag */
+@media (max-width: 760px) {
+  .bag3d-shell {
+    aspect-ratio: 1 / 1.16;
+  }
+}
+
+@media (max-width: 520px) {
+  .bag3d-shell {
+    aspect-ratio: 1 / 1.20;
+  }
+
+  .bag3d-down {
+    bottom: 50px;
+  }
+}
