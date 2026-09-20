@@ -290,7 +290,7 @@ export default function Bag3D({
     fill.position.set(-4, 2, -3)
     scene.add(fill)
 
-    const scale = 3.8 / heightMm
+    const scale = (3.8 * 1.2) / heightMm
     const w = widthMm * scale
     const d = Math.max(depthMm * scale, 0.5)
     const h = heightMm * scale
