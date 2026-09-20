@@ -6291,3 +6291,55 @@ summary:focus-visible {
     bottom: 56px;
   }
 }
+
+
+/* Final mobile 3D layout: centre the bag and reserve equal control space above/below */
+@media (max-width: 760px) {
+  .bag3d-shell {
+    aspect-ratio: 1 / 1.24;
+  }
+
+  .bag3d-canvas {
+    top: 80px;
+    right: 0;
+    bottom: 80px;
+    left: 0;
+  }
+
+  .bag3d-up {
+    top: 14px;
+  }
+
+  .bag3d-down {
+    bottom: 34px;
+  }
+
+  .bag3d-hint {
+    bottom: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .bag3d-shell {
+    aspect-ratio: 1 / 1.30;
+  }
+
+  .bag3d-canvas {
+    top: 96px;
+    right: 0;
+    bottom: 96px;
+    left: 0;
+  }
+
+  .bag3d-up {
+    top: 14px;
+  }
+
+  .bag3d-down {
+    bottom: 38px;
+  }
+
+  .bag3d-hint {
+    bottom: 8px;
+  }
+}
