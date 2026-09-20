@@ -5122,3 +5122,129 @@ canvas {
     flex:1 1 auto;
   }
 }
+
+
+.admin-pricing-panel {
+  border-color:rgba(212,176,106,.32);
+  background:#fffdf8;
+}
+
+.admin-shipping-setting,
+.admin-run-price {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:14px;
+  border:1px solid rgba(14,42,71,.09);
+  border-radius:13px;
+  background:#f8f6f0;
+}
+
+.admin-shipping-setting > div,
+.admin-run-price > div {
+  display:grid;
+  gap:3px;
+}
+
+.admin-shipping-setting strong,
+.admin-run-price strong,
+.admin-run-price span {
+  color:#0e2a47;
+  font-size:11px;
+  font-weight:850;
+}
+
+.admin-shipping-setting span,
+.admin-run-price small {
+  color:#88847b;
+  font-size:9px;
+}
+
+.admin-shipping-setting form,
+.admin-run-price {
+  align-items:center;
+}
+
+.admin-shipping-setting form {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.admin-shipping-setting label,
+.admin-run-price label {
+  height:38px;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:0 9px;
+  border:1px solid rgba(14,42,71,.12);
+  border-radius:9px;
+  background:#fff;
+  color:#0e2a47;
+  font-size:11px;
+  font-weight:900;
+}
+
+.admin-shipping-setting input,
+.admin-run-price input {
+  width:82px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#171713;
+  font:inherit;
+  font-weight:800;
+}
+
+.admin-shipping-setting button,
+.admin-run-price button {
+  min-height:38px;
+  padding:0 12px;
+  border:0;
+  border-radius:9px;
+  background:#0e2a47;
+  color:#fff;
+  font:inherit;
+  font-size:9px;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.admin-run-price {
+  padding:11px;
+}
+
+.shipping-total {
+  margin-top:6px;
+}
+
+.order-grand-total {
+  margin-top:6px;
+  padding-top:12px;
+  border-top:1px solid rgba(23,23,19,.10);
+}
+
+.order-grand-total strong {
+  font-size:16px;
+}
+
+@media (max-width:620px) {
+  .admin-shipping-setting,
+  .admin-run-price {
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .admin-shipping-setting form {
+    width:100%;
+  }
+  .admin-shipping-setting label,
+  .admin-run-price label {
+    flex:1 1 auto;
+  }
+  .admin-shipping-setting input,
+  .admin-run-price input {
+    width:100%;
+  }
+}
