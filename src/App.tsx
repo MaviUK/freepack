@@ -357,7 +357,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'What happens after I upload artwork?',
-    answer: 'FreePack reviews the artwork before production. It can be approved, or we may ask for changes if there is a print, quality, legal or content issue.',
+    answer: 'FreePack reviews the artwork before production. The uploader checks file type, file size and raster resolution before checkout. Artwork can then be approved, or we may ask for changes if there is a print, quality, legal or content issue.',
   },
   {
     question: 'What if my artwork is rejected?',
@@ -812,6 +812,8 @@ export default function App() {
   const [selection, setSelection] = useState<Rect | null>(null)
   const [placementMessage, setPlacementMessage] = useState('')
   const [artwork, setArtwork] = useState<string | null>(null)
+  const [artworkQuality, setArtworkQuality] = useState<{ level: 'good' | 'warning'; message: string } | null>(null)
+  const [artworkError, setArtworkError] = useState('')
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin')
@@ -2300,6 +2302,8 @@ export default function App() {
     setPlacementMessage('')
     setArtwork(null)
     setArtworkFile(null)
+    setArtworkQuality(null)
+    setArtworkError('')
     setReservationMessage('')
     setActiveBookingId(null)
     setCheckoutOpen(false)
@@ -2426,6 +2430,8 @@ export default function App() {
     )
     setArtwork(null)
     setArtworkFile(null)
+    setArtworkQuality(null)
+    setArtworkError('')
     setReservationMessage('')
     setActiveBookingId(null)
     setCheckoutOpen(false)
@@ -2433,9 +2439,78 @@ export default function App() {
 
   function uploadArtwork(file?: File) {
     if (!file || !selection) return
-    setArtworkFile(file)
+
+    const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+    setArtworkError('')
+    setArtworkQuality(null)
+
+    if (!allowedTypes.has(file.type)) {
+      setArtwork(null)
+      setArtworkFile(null)
+      setArtworkError('Please upload PNG, JPG, WEBP or SVG artwork.')
+      if (fileInput.current) fileInput.current.value = ''
+      return
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setArtwork(null)
+      setArtworkFile(null)
+      setArtworkError('Artwork must be 15 MB or smaller.')
+      if (fileInput.current) fileInput.current.value = ''
+      return
+    }
+
+    const rows = selection.bottom - selection.top + 1
+    const cols = selection.right - selection.left + 1
+    const recommendedWidth = Math.ceil((cols * 30 / 25.4) * 300)
+    const recommendedHeight = Math.ceil((rows * 30 / 25.4) * 300)
+
     const reader = new FileReader()
-    reader.onload = () => setArtwork(String(reader.result))
+    reader.onload = () => {
+      const dataUrl = String(reader.result)
+      setArtworkFile(file)
+      setArtwork(dataUrl)
+
+      if (file.type === 'image/svg+xml') {
+        setArtworkQuality({
+          level: 'good',
+          message: 'Vector artwork loaded — ideal for sharp print at this size.',
+        })
+        return
+      }
+
+      const image = new Image()
+      image.onload = () => {
+        const widthRatio = image.naturalWidth / recommendedWidth
+        const heightRatio = image.naturalHeight / recommendedHeight
+        const ratio = Math.min(widthRatio, heightRatio)
+
+        if (ratio >= 1) {
+          setArtworkQuality({
+            level: 'good',
+            message: `${image.naturalWidth} × ${image.naturalHeight}px — suitable for the selected ${cols * 30} × ${rows * 30} mm area at approximately 300 DPI or better.`,
+          })
+        } else {
+          const effectiveDpi = Math.max(1, Math.floor(300 * ratio))
+          setArtworkQuality({
+            level: 'warning',
+            message: `${image.naturalWidth} × ${image.naturalHeight}px — approximately ${effectiveDpi} DPI at this size. For the sharpest print, use at least ${recommendedWidth} × ${recommendedHeight}px or upload an SVG.`,
+          })
+        }
+      }
+      image.onerror = () => {
+        setArtworkQuality({
+          level: 'warning',
+          message: `Artwork loaded, but we could not check its resolution. Recommended raster size: at least ${recommendedWidth} × ${recommendedHeight}px.`,
+        })
+      }
+      image.src = dataUrl
+    }
+    reader.onerror = () => {
+      setArtwork(null)
+      setArtworkFile(null)
+      setArtworkError('We could not read that file. Please try another artwork file.')
+    }
     reader.readAsDataURL(file)
   }
 
@@ -3058,8 +3133,12 @@ export default function App() {
                       {runId === item.id && <Check size={17} />}
                     </div>
                     <strong>{item.dimensions}</strong>
+                    <div className="run-option-price">
+                      <strong>£{((item.pricePerSquarePence ?? DEMO_SQUARE_PRICE * 100) / 100).toFixed(2)}</strong>
+                      <span>per 3 cm × 3 cm space</span>
+                    </div>
                     <div className="run-option-meta">
-                      <span>{item.totalBagSquares} total bag squares</span>
+                      <span>{item.totalBagSquares} total bag spaces</span>
                       <span>{availability}% available across full bag</span>
                     </div>
                     <div className="availability-track">
@@ -3159,6 +3238,23 @@ export default function App() {
                 onChange={(event) => uploadArtwork(event.target.files?.[0])}
               />
 
+              <div className="artwork-requirements">
+                <div>
+                  <strong>Print-ready artwork</strong>
+                  <span>PNG, JPG, WEBP or SVG · maximum 15 MB</span>
+                </div>
+                <div>
+                  <strong>{selection ? `${(selection.right - selection.left + 1) * 30} × ${(selection.bottom - selection.top + 1) * 30} mm` : 'Select a space first'}</strong>
+                  <span>{selection
+                    ? `Recommended raster size: at least ${Math.ceil((((selection.right - selection.left + 1) * 30) / 25.4) * 300)} × ${Math.ceil((((selection.bottom - selection.top + 1) * 30) / 25.4) * 300)} px`
+                    : 'We will calculate the recommended resolution for you.'}</span>
+                </div>
+                <div>
+                  <strong>Best results</strong>
+                  <span>SVG is best for logos. Use a transparent PNG where you do not want a background.</span>
+                </div>
+              </div>
+
               <div className={`artwork-upload-card ${artwork ? 'has-artwork' : ''}`}>
                 {artwork ? (
                   <div className="artwork-upload-preview" style={{ backgroundImage: `url("${artwork}")` }} />
@@ -3166,8 +3262,8 @@ export default function App() {
                   <div className="artwork-upload-placeholder"><ImagePlus size={28} /></div>
                 )}
                 <div className="artwork-upload-copy">
-                  <strong>{artwork ? 'Artwork loaded' : 'Upload your artwork'}</strong>
-                  <span>PNG, JPG, WEBP or SVG</span>
+                  <strong>{artwork ? artworkFile?.name ?? 'Artwork loaded' : 'Upload your artwork'}</strong>
+                  <span>{artworkFile ? `${(artworkFile.size / 1024 / 1024).toFixed(2)} MB` : 'Your file will be checked before checkout.'}</span>
                 </div>
                 <button
                   className="button upload-button"
@@ -3178,6 +3274,14 @@ export default function App() {
                   {artwork ? 'Change artwork' : 'Choose file'}
                 </button>
               </div>
+
+              {artworkError && <div className="artwork-quality artwork-quality-error">{artworkError}</div>}
+              {artworkQuality && (
+                <div className={`artwork-quality artwork-quality-${artworkQuality.level}`}>
+                  {artworkQuality.level === 'good' ? <Check size={16} /> : <ImagePlus size={16} />}
+                  <span>{artworkQuality.message}</span>
+                </div>
+              )}
             </div>
 
             <div className="ad-flow-step ad-flow-review">
@@ -3195,7 +3299,8 @@ export default function App() {
                   <div><span>Run</span><strong>{run.id}</strong></div>
                   <div><span>Bag face</span><strong>{panel.label}</strong></div>
                   <div><span>Selected shape</span><strong>{shapeLabel(selection)}</strong></div>
-                  <div><span>3 cm squares</span><strong>{selectedCount}</strong></div>
+                  <div><span>Print size</span><strong>{selection ? `${(selection.right - selection.left + 1) * 30} × ${(selection.bottom - selection.top + 1) * 30} mm` : '—'}</strong></div>
+                  <div><span>3 cm spaces</span><strong>{selectedCount}</strong></div>
                   <div><span>Estimated start</span><strong>{run.estimatedStart}</strong></div>
                 </div>
 
@@ -3204,7 +3309,7 @@ export default function App() {
                   <strong>£{(squarePricePence / 100).toFixed(2)}</strong>
                   <span>Total</span>
                   <strong className="ad-review-total">£{((selectedCount * squarePricePence) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                  <small>The same square price applies across every bag face on this production run.</small>
+                  <small>This price is fixed for the selected production run and applies across every bag face.</small>
                 </div>
               </div>
 
