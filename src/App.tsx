@@ -322,6 +322,93 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
 
 type LegalPageKey = 'privacy' | 'terms' | 'advertiser-terms' | 'takeaway-terms' | 'cookies' | 'contact'
 
+const FAQ_ITEMS = [
+  {
+    question: 'How can the bags be free?',
+    answer: 'Brands buy advertising space on each production run. That advertising revenue funds the bags, so participating takeaways pay £0.00 for the packaging itself.',
+  },
+  {
+    question: 'Do takeaways pay anything?',
+    answer: 'The bags themselves are free. A shipping charge may apply to an order, and the exact shipping amount is shown before checkout.',
+  },
+  {
+    question: 'Who can order FreePack bags?',
+    answer: 'FreePack is intended for genuine takeaways, food-service businesses and similar businesses that use bags in normal day-to-day trade. Orders may be checked before dispatch.',
+  },
+  {
+    question: 'Are the bags custom printed for each takeaway?',
+    answer: 'No. Each production run uses one shared design. Advertisers appear on that shared bag, and participating takeaways order boxes from the same run.',
+  },
+  {
+    question: 'How does advertising work?',
+    answer: 'Choose an open production run, select the exact area you want on the 3D bag, upload your artwork and pay online. Each selectable unit represents a 3 cm × 3 cm advertising space.',
+  },
+  {
+    question: 'Can I buy a larger advert?',
+    answer: 'Yes. You can select multiple adjoining 3 cm × 3 cm units to create a larger rectangular advert, as long as that space is still available.',
+  },
+  {
+    question: 'Where will my advert appear?',
+    answer: 'You choose the exact bag face and position before paying. Your approved artwork is then placed in that purchased area for the relevant production run.',
+  },
+  {
+    question: 'Where do the bags go?',
+    answer: 'Bags are supplied to participating takeaway and food-service businesses that order stock from the relevant runs. FreePack does not guarantee delivery to a specific individual customer or a fixed number of impressions.',
+  },
+  {
+    question: 'What happens after I upload artwork?',
+    answer: 'FreePack reviews the artwork before production. It can be approved, or we may ask for changes if there is a print, quality, legal or content issue.',
+  },
+  {
+    question: 'What if my artwork is rejected?',
+    answer: 'You will be told what needs changing and can replace the artwork from your account. The aim is to get suitable artwork approved before the run is sent to print.',
+  },
+  {
+    question: 'When will a production run be printed?',
+    answer: 'Each run has an estimated schedule. Dates can move depending on advertising sales, artwork approval, manufacturing and shipping. Your account shows the latest run status.',
+  },
+  {
+    question: 'Can advertisers see the price before buying?',
+    answer: 'Yes. The current price per 3 cm × 3 cm unit is shown on the advertising journey, and the total updates with the size of the area you select before payment.',
+  },
+]
+
+function FaqPage() {
+  return (
+    <section className="faq-page shell">
+      <a className="page-back" href="/"><ArrowLeft size={16} /> Back to FreePack</a>
+      <div className="faq-hero">
+        <p className="kicker">HOW FREEPACK WORKS</p>
+        <h1>Questions, answered.</h1>
+        <p>Free packaging for takeaways, funded by advertisers. Here are the details people usually want to know first.</p>
+      </div>
+
+      <div className="faq-layout">
+        <div className="faq-list">
+          {FAQ_ITEMS.map((item) => (
+            <details key={item.question} className="faq-item">
+              <summary>
+                <span>{item.question}</span>
+                <Plus size={18} />
+              </summary>
+              <p>{item.answer}</p>
+            </details>
+          ))}
+        </div>
+
+        <aside className="faq-aside">
+          <p className="kicker">THE MODEL</p>
+          <div className="faq-model-step"><span>01</span><strong>Brands advertise</strong><small>They buy space on a production run.</small></div>
+          <div className="faq-model-step"><span>02</span><strong>FreePack prints</strong><small>Approved adverts fund one shared bag design.</small></div>
+          <div className="faq-model-step"><span>03</span><strong>Takeaways distribute</strong><small>Food businesses use the bags in everyday orders.</small></div>
+          <a className="button button-dark" href="/advertise">Advertise with FreePack <ArrowRight size={16} /></a>
+          <a className="button button-outline-dark" href="/bags">Order free bags</a>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
 function LegalPage({ page }: { page: LegalPageKey }) {
   const details = (
     <address className="legal-business-card">
@@ -2666,14 +2753,16 @@ export default function App() {
                 ? 'contact'
                 : null
 
-  const publicPage: 'home' | 'bags' | 'advertise' | null =
+  const publicPage: 'home' | 'bags' | 'advertise' | 'faq' | null =
     isAdminRoute || legalPage
       ? null
       : currentPath === '/bags'
         ? 'bags'
         : currentPath === '/advertise'
           ? 'advertise'
-          : 'home'
+          : currentPath === '/faq'
+            ? 'faq'
+            : 'home'
 
   return (
     <main className={isAdminRoute ? 'admin-route' : undefined}>
@@ -2717,8 +2806,8 @@ export default function App() {
               <div className="eyebrow">PACKAGING A BRIGHTER TOMORROW</div>
               <h1>Packaging that<br /><em>works harder.</em></h1>
               <p>
-                Freepack connects takeaways that need packaging with brands that want to be seen.
-                Advertising funds the production, so food businesses get quality paper bags for free.
+                Brands advertise. FreePack prints the bags. Takeaways hand them to customers for free.
+                It turns everyday packaging into physical advertising that travels into the real world.
               </p>
               <div className="hero-actions">
                 <a className="button button-gold" href="/bags">I need free bags <ArrowRight size={18} /></a>
@@ -2733,7 +2822,7 @@ export default function App() {
                 <strong>VISIBLE FOR BRANDS</strong>
                 <strong>USEFUL FOR EVERYONE</strong>
               </div>
-              <p>One shared bag. Multiple advertisers. Thousands of everyday customer interactions.</p>
+              <p>One shared bag. Multiple advertisers. A physical media product carried out of the takeaway and into the street.</p>
               <span className="manifesto-tagline">GOOD PACKAGING<br />GOES FURTHER.</span>
             </aside>
           </section>
@@ -2765,22 +2854,22 @@ export default function App() {
               <article>
                 <span>01</span>
                 <div>
-                  <strong>Brands fund a production run</strong>
-                  <p>Advertisers choose a bag size, select the exact space they want and upload their artwork.</p>
+                  <strong>Brands advertise</strong>
+                  <p>Advertisers choose a live bag run, select their exact position and buy the space online.</p>
                 </div>
               </article>
               <article>
                 <span>02</span>
                 <div>
-                  <strong>We print one shared design</strong>
-                  <p>Approved adverts are combined on the same production run, keeping the model simple and scalable.</p>
+                  <strong>FreePack prints the bags</strong>
+                  <p>Approved adverts are combined into one shared design and the advertising revenue funds production.</p>
                 </div>
               </article>
               <article>
                 <span>03</span>
                 <div>
-                  <strong>Takeaways receive the bags free</strong>
-                  <p>Food businesses order the sizes they need and put the bags straight into everyday circulation.</p>
+                  <strong>Takeaways distribute them</strong>
+                  <p>Food businesses order the stock they need for £0 and the bags leave with everyday customer orders.</p>
                 </div>
               </article>
             </div>
@@ -2821,6 +2910,15 @@ export default function App() {
               <p>Shared production keeps the model focused, efficient and designed around useful packaging.</p>
             </article>
           </section>
+
+          <section className="home-faq shell">
+            <div>
+              <p className="kicker">STILL WONDERING HOW IT WORKS?</p>
+              <h2>The bags are free because the advertising pays for them.</h2>
+              <p>Takeaways pay £0 for the packaging itself. Advertisers fund each shared production run by buying physical space on the bag.</p>
+            </div>
+            <a className="button button-dark" href="/faq">Read the FAQs <ArrowRight size={17} /></a>
+          </section>
         </>
       )}
 
@@ -2830,7 +2928,15 @@ export default function App() {
             <a className="page-back" href="/"><ArrowLeft size={16} /> About Freepack</a>
             <p className="eyebrow">FREE PACKAGING FOR TAKEAWAYS</p>
             <h1>Choose your bags.<br /><em>Pay £0.</em></h1>
-            <p>Pick the sizes and box quantities your business needs. Available stock is supplied free because the production run has already been funded by advertisers.</p>
+            <p>Advertisers have already funded the production run, so your business pays £0 for the bags. Choose the sizes and box quantities you need; any shipping charge is shown separately before you order.</p>
+          </section>
+
+          <section className="model-strip shell" aria-label="How free packaging works">
+            <div><span>01</span><strong>Brands advertise</strong></div>
+            <ArrowRight size={18} />
+            <div><span>02</span><strong>We print the bags</strong></div>
+            <ArrowRight size={18} />
+            <div><span>03</span><strong>You use them for £0</strong></div>
           </section>
 
           <section className="takeaway-order shell" id="takeaway-order">
@@ -2921,7 +3027,7 @@ export default function App() {
             <a className="page-back" href="/"><ArrowLeft size={16} /> About Freepack</a>
             <p className="eyebrow">ADVERTISING THAT TRAVELS</p>
             <h1>Put your brand<br /><em>in their hands.</em></h1>
-            <p>Choose an upcoming production run, select the exact area you want on the bag and upload your artwork. Your advert then travels with every bag in that run.</p>
+            <p>Buy physical advertising space on a product people actually carry. Choose an upcoming production run, pick the exact position on the bag, upload your artwork and see the total before you pay.</p>
           </section>
 
           <section className="runs shell" id="runs">
@@ -2930,7 +3036,7 @@ export default function App() {
                 <p className="kicker">OPEN ADVERTISING RUNS</p>
                 <h2>Choose a bag size.</h2>
               </div>
-              <p>Every size has its own advertising layout, while the price per 3 cm square stays the same.</p>
+              <p>Each run has a live price per 3 cm × 3 cm unit. Buy one unit or combine adjoining units to build a larger advert.</p>
             </div>
 
             <div className="run-options">
@@ -3125,6 +3231,8 @@ export default function App() {
           </section>
         </>
       )}
+
+      {publicPage === 'faq' && <FaqPage />}
 
       {legalPage && <LegalPage page={legalPage} />}
 
@@ -4297,6 +4405,7 @@ export default function App() {
               <a href="/">Who we are</a>
               <a href="/bags">Free bags</a>
               <a href="/advertise">Advertise</a>
+              <a href="/faq">FAQs</a>
             </div>
             <div>
               <strong>Legal</strong>
