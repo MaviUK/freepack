@@ -2840,7 +2840,8 @@ export default function App() {
             : 'home'
 
   return (
-    <main className={isAdminRoute ? 'admin-route' : undefined}>
+    <main id="main-content" tabIndex={-1} className={isAdminRoute ? 'admin-route' : undefined}>
+      {!isAdminRoute && <a className="skip-link" href="#content-start">Skip to main content</a>}
       {!isAdminRoute && paymentBanner && (
         <div className="payment-banner">
           <span>{paymentBanner}</span>
@@ -2851,7 +2852,7 @@ export default function App() {
         <a className="brand" href="/" aria-label="Freepack home">
           <img src="/freepack-logo-white.svg" alt="Freepack" />
         </a>
-        <nav>
+        <nav aria-label="Primary navigation">
           <a className={publicPage === 'home' ? 'active' : ''} href="/">Who we are</a>
           <a className={publicPage === 'bags' ? 'active' : ''} href="/bags">Free bags</a>
           <a className={publicPage === 'advertise' ? 'active' : ''} href="/advertise">Advertise</a>
@@ -2873,6 +2874,7 @@ export default function App() {
           </button>
         )}
       </header>}
+      {!isAdminRoute && <div id="content-start" tabIndex={-1} className="content-start-anchor" />}
 
       {publicPage === 'home' && (
         <>
@@ -3158,7 +3160,7 @@ export default function App() {
                 <div>
                   <p className="kicker">CHOOSE YOUR SPACE</p>
                   <h2>Pick your position on the 3D bag.</h2>
-                  <p>Rotate the bag, choose a face and tap an available square. Tap beside your selection to make the advert larger.</p>
+                  <p>Choose a face and tap an available space. Tap beside your selection to make the advert larger. On mobile, swipe sideways to rotate or use the simple button grid below.</p>
                 </div>
               </div>
 
@@ -3181,6 +3183,7 @@ export default function App() {
                       <button
                         key={key}
                         className={panelKey === key ? 'active' : ''}
+                        aria-pressed={panelKey === key}
                         onClick={() => changePanel(key)}
                       >
                         <span>{face.shortLabel}</span>
@@ -3209,10 +3212,64 @@ export default function App() {
                   onCellSelect={chooseGridCell}
                 />
 
+                <details className="simple-grid-selector">
+                  <summary>
+                    <span>Prefer buttons? Use the simple grid selector</span>
+                    <small>Keyboard, screen-reader and mobile friendly</small>
+                  </summary>
+                  <div className="simple-grid-intro">
+                    <strong>{panel.label}</strong>
+                    <span>Choose one available space, then choose a free space directly beside the selection to make it larger.</span>
+                  </div>
+                  <div
+                    className="simple-grid"
+                    role="grid"
+                    aria-label={`${panel.label} advertising spaces`}
+                    style={{ gridTemplateColumns: `repeat(${panel.cols}, minmax(0, 1fr))` }}
+                  >
+                    {Array.from({ length: panel.rows }, (_, row) =>
+                      Array.from({ length: panel.cols }, (_, col) => {
+                        const key = `${row}-${col}`
+                        const sold = soldCells.has(key)
+                        const branded = panelBrandRows.includes(row)
+                        const selected = Boolean(
+                          selection &&
+                          row >= selection.top &&
+                          row <= selection.bottom &&
+                          col >= selection.left &&
+                          col <= selection.right,
+                        )
+                        const disabled = sold || branded
+                        const state = sold ? 'sold' : branded ? 'branding' : selected ? 'selected' : 'available'
+
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            role="gridcell"
+                            className={`simple-grid-cell ${state}`}
+                            disabled={disabled}
+                            aria-pressed={selected}
+                            aria-label={`${panel.label}, row ${row + 1}, column ${col + 1}: ${sold ? 'sold' : branded ? 'FreePack branding' : selected ? 'selected' : 'available'}`}
+                            onClick={() => chooseGridCell(panelKey, { row, col })}
+                          >
+                            <span aria-hidden="true">{row + 1}.{col + 1}</span>
+                          </button>
+                        )
+                      }),
+                    )}
+                  </div>
+                  <div className="simple-grid-key" aria-hidden="true">
+                    <span><i className="available" /> Available</span>
+                    <span><i className="selected" /> Selected</span>
+                    <span><i className="sold" /> Sold</span>
+                  </div>
+                </details>
+
                 {placementMessage && (
-                  <div className="selection-warning">{placementMessage}</div>
+                  <div className="selection-warning" role="status" aria-live="polite">{placementMessage}</div>
                 )}
-                <p className="bag-help">
+                <p className="bag-help" role="status" aria-live="polite">
                   {selection
                     ? `Selected: ${shapeLabel(selection)} on ${panel.label}. Tap a free square beside the selected edge to grow it.`
                     : 'Rotate the bag and tap any available grid square to start with 1 × 1.'}
