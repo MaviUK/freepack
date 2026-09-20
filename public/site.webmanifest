@@ -8,7 +8,7 @@
   "theme_color": "#0E2A47",
   "icons": [
     {
-      "src": "/freepack-logo-navy.svg",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }
