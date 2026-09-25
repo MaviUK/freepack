@@ -7254,3 +7254,85 @@ summary:focus-visible {
     text-align:center;
   }
 }
+
+
+/* Production run management */
+.admin-primary-action {
+  min-height:38px;
+  padding:0 13px !important;
+  border-radius:10px !important;
+  background:#0e2a47 !important;
+  color:#fff !important;
+  font-size:10px !important;
+}
+
+.admin-run-badges {
+  display:flex !important;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.admin-production-management-actions button.danger {
+  color:#8a463d;
+  border-color:rgba(138,70,61,.18);
+}
+
+.admin-run-editor {
+  width:min(720px,calc(100% - 28px));
+}
+
+.admin-run-editor h2 {
+  max-width:560px;
+}
+
+.admin-run-form select {
+  width:100%;
+  min-height:46px;
+  border:1px solid rgba(14,42,71,.15);
+  border-radius:12px;
+  background:#fff;
+  color:#171713;
+  padding:0 12px;
+  font:inherit;
+  outline:none;
+}
+
+.admin-run-form select:focus {
+  border-color:#0e2a47;
+  box-shadow:0 0 0 3px rgba(14,42,71,.07);
+}
+
+.admin-run-editor-summary {
+  display:grid;
+  gap:4px;
+  padding:12px 14px;
+  border-radius:12px;
+  background:#eef2ea;
+  color:#40533c;
+}
+
+.admin-run-editor-summary strong {
+  font-size:11px;
+}
+
+.admin-run-editor-summary span {
+  font-size:10px;
+}
+
+@media (max-width:700px) {
+  .admin-panel-head {
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .admin-primary-action {
+    width:100%;
+    justify-content:center;
+  }
+
+  .admin-run-badges {
+    justify-content:flex-start;
+  }
+}
