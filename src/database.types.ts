@@ -286,6 +286,7 @@ export type Database = {
       }
       production_runs: {
         Row: {
+          archived_at: string | null
           bag_quantity: number | null
           bag_size_id: string
           created_at: string
@@ -295,12 +296,14 @@ export type Database = {
           price_per_square_pence: number
           reservation_minutes: number
           run_code: string
+          sales_paused: boolean
           status: Database["public"]["Enums"]["run_status"]
           status_note: string | null
           status_updated_at: string
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           bag_quantity?: number | null
           bag_size_id: string
           created_at?: string
@@ -310,12 +313,14 @@ export type Database = {
           price_per_square_pence?: number
           reservation_minutes?: number
           run_code: string
+          sales_paused?: boolean
           status?: Database["public"]["Enums"]["run_status"]
           status_note?: string | null
           status_updated_at?: string
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           bag_quantity?: number | null
           bag_size_id?: string
           created_at?: string
@@ -325,6 +330,7 @@ export type Database = {
           price_per_square_pence?: number
           reservation_minutes?: number
           run_code?: string
+          sales_paused?: boolean
           status?: Database["public"]["Enums"]["run_status"]
           status_note?: string | null
           status_updated_at?: string
