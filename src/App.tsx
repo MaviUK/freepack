@@ -116,9 +116,18 @@ type AdminCustomer = {
   last_activity_at: string
 }
 
+type AdminBagSize = {
+  id: string
+  code: string
+  name: string
+  bags_per_box: number
+  total_square_count: number
+}
+
 type AdminRun = {
   id: string
   run_code: string
+  bag_size_id: string
   status: string
   status_updated_at: string
   status_note: string | null
@@ -126,6 +135,9 @@ type AdminRun = {
   estimated_start_date: string | null
   price_per_square_pence: number
   bag_quantity: number | null
+  reservation_minutes: number
+  sales_paused: boolean
+  archived_at: string | null
   bag_sizes: {
     name: string
     total_square_count: number
@@ -1003,6 +1015,19 @@ export default function App() {
   const [adminCustomers, setAdminCustomers] = useState<AdminCustomer[]>([])
   const [adminCustomerSearch, setAdminCustomerSearch] = useState('')
   const [adminRuns, setAdminRuns] = useState<AdminRun[]>([])
+  const [adminBagSizes, setAdminBagSizes] = useState<AdminBagSize[]>([])
+  const [runEditorOpen, setRunEditorOpen] = useState(false)
+  const [runEditorMode, setRunEditorMode] = useState<'create' | 'edit' | 'duplicate'>('create')
+  const [runEditorSourceId, setRunEditorSourceId] = useState<string | null>(null)
+  const [runEditorSaving, setRunEditorSaving] = useState(false)
+  const [runEditor, setRunEditor] = useState({
+    runCode: '',
+    bagSizeId: '',
+    estimatedStartDate: '',
+    bagQuantity: '',
+    price: '100.00',
+    reservationMinutes: '30',
+  })
   const [shippingPricePence, setShippingPricePence] = useState(0)
   const [takeawayPaymentSessionId, setTakeawayPaymentSessionId] = useState<string | null>(null)
   const [adminRunSales, setAdminRunSales] = useState<Record<string, { sold: number; reserved: number }>>({})
@@ -1620,7 +1645,7 @@ export default function App() {
       setAdminLoading(true)
       setAdminMessage('')
 
-      const [bookingsResult, ordersResult, runsResult, customersResult] = await Promise.all([
+      const [bookingsResult, ordersResult, runsResult, customersResult, bagSizesResult] = await Promise.all([
         supabase
           .from('ad_bookings')
           .select(`
@@ -1689,7 +1714,7 @@ export default function App() {
 
       if (cancelled) return
 
-      if (bookingsResult.error || ordersResult.error || runsResult.error || customersResult.error) {
+      if (bookingsResult.error || ordersResult.error || runsResult.error || customersResult.error || bagSizesResult.error) {
         setAdminMessage(
           bookingsResult.error?.message ??
           ordersResult.error?.message ??
@@ -2095,6 +2120,155 @@ export default function App() {
     setAdminMessage(`Shipping price updated to £${(pricePence / 100).toFixed(2)} per order.`)
   }
 
+
+  function nextRunCode(source?: AdminRun) {
+    const bag = adminBagSizes.find((item) => item.id === (source?.bag_size_id ?? runEditor.bagSizeId))
+    const prefix = bag?.code || source?.run_code.split('-')[0] || 'RUN'
+    const existing = adminRuns
+      .map((item) => item.run_code)
+      .filter((code) => code.startsWith(`${prefix}-`))
+      .map((code) => Number(code.split('-').pop()))
+      .filter((value) => Number.isFinite(value))
+    const next = Math.max(0, ...existing) + 1
+    return `${prefix}-${String(next).padStart(3, '0')}`
+  }
+
+  function openRunEditor(mode: 'create' | 'edit' | 'duplicate', source?: AdminRun) {
+    const defaultBagId = source?.bag_size_id ?? adminBagSizes[0]?.id ?? ''
+    setRunEditorMode(mode)
+    setRunEditorSourceId(source?.id ?? null)
+    setRunEditor({
+      runCode: mode === 'edit' && source ? source.run_code : nextRunCode(source),
+      bagSizeId: defaultBagId,
+      estimatedStartDate: source?.estimated_start_date ?? '',
+      bagQuantity: source?.bag_quantity ? String(source.bag_quantity) : '',
+      price: ((source?.price_per_square_pence ?? 10000) / 100).toFixed(2),
+      reservationMinutes: String(source?.reservation_minutes ?? 30),
+    })
+    setRunEditorOpen(true)
+  }
+
+  async function saveRunEditor(event: React.FormEvent) {
+    event.preventDefault()
+    if (!runEditor.runCode.trim() || !runEditor.bagSizeId) {
+      setAdminMessage('Enter a run code and choose a bag size.')
+      return
+    }
+
+    const pricePence = Math.round(Number(runEditor.price) * 100)
+    const reservationMinutes = Number(runEditor.reservationMinutes)
+    const bagQuantity = runEditor.bagQuantity.trim() ? Number(runEditor.bagQuantity) : null
+
+    if (!Number.isFinite(pricePence) || pricePence < 0 || !Number.isInteger(reservationMinutes) || reservationMinutes < 1 || reservationMinutes > 120 || (bagQuantity !== null && (!Number.isInteger(bagQuantity) || bagQuantity <= 0))) {
+      setAdminMessage('Check the price, reservation time and bag quantity.')
+      return
+    }
+
+    setRunEditorSaving(true)
+    setAdminMessage('')
+
+    const payload = {
+      run_code: runEditor.runCode.trim().toUpperCase(),
+      bag_size_id: runEditor.bagSizeId,
+      estimated_start_date: runEditor.estimatedStartDate || null,
+      bag_quantity: bagQuantity,
+      price_per_square_pence: pricePence,
+      reservation_minutes: reservationMinutes,
+      updated_at: new Date().toISOString(),
+    }
+
+    let error: { message: string } | null = null
+    if (runEditorMode === 'edit' && runEditorSourceId) {
+      const result = await supabase.from('production_runs').update(payload).eq('id', runEditorSourceId)
+      error = result.error
+    } else {
+      const result = await supabase.from('production_runs').insert({
+        ...payload,
+        status: 'draft',
+        sales_paused: true,
+      } as any)
+      error = result.error
+    }
+
+    if (error) {
+      setAdminMessage(error.message)
+      setRunEditorSaving(false)
+      return
+    }
+
+    setRunEditorOpen(false)
+    setRunEditorSaving(false)
+    setAdminMessage(runEditorMode === 'edit' ? 'Production run updated.' : 'Production run created as a paused draft.')
+
+    const { data } = await supabase
+      .from('production_runs')
+      .select(`
+        id,
+        run_code,
+        bag_size_id,
+        status,
+        status_updated_at,
+        status_note,
+        estimated_stage_date,
+        estimated_start_date,
+        price_per_square_pence,
+        bag_quantity,
+        reservation_minutes,
+        sales_paused,
+        archived_at,
+        bag_sizes (
+          name,
+          total_square_count,
+          front_width_mm,
+          side_gusset_mm,
+          height_mm,
+          front_cols,
+          front_rows,
+          side_cols,
+          side_rows
+        )
+      `)
+      .order('run_code')
+
+    if (data) setAdminRuns(data as AdminRun[])
+  }
+
+  async function toggleRunPause(run: AdminRun) {
+    const nextPaused = !run.sales_paused
+    const { error } = await supabase
+      .from('production_runs')
+      .update({ sales_paused: nextPaused, updated_at: new Date().toISOString() } as any)
+      .eq('id', run.id)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminRuns((current) => current.map((item) => item.id === run.id ? { ...item, sales_paused: nextPaused } : item))
+    setAdminMessage(nextPaused ? 'Advertising sales paused for this run.' : 'Advertising sales resumed for this run.')
+  }
+
+  async function archiveRun(run: AdminRun) {
+    const hasBookings = adminBookings.some((booking) => firstRelation(booking.production_runs)?.id === run.id)
+    if (hasBookings && !window.confirm(`Archive ${run.run_code}? Existing bookings will stay in customer and admin history, but this run will be removed from public sale.`)) return
+    if (!hasBookings && !window.confirm(`Archive ${run.run_code}? It will be removed from public sale.`)) return
+
+    const archivedAt = new Date().toISOString()
+    const { error } = await supabase
+      .from('production_runs')
+      .update({ archived_at: archivedAt, sales_paused: true, updated_at: archivedAt } as any)
+      .eq('id', run.id)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminRuns((current) => current.map((item) => item.id === run.id ? { ...item, archived_at: archivedAt, sales_paused: true } : item))
+    setAdminMessage(`${run.run_code} archived.`)
+  }
+
   async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
     setAdminMessage('')
 
@@ -2208,6 +2382,7 @@ export default function App() {
         .select(`
           id,
           run_code,
+          bag_size_id,
           status,
           estimated_start_date,
           price_per_square_pence,
@@ -3957,8 +4132,11 @@ export default function App() {
                             <div>
                               <p className="kicker">PRODUCTION</p>
                               <h2>Production runs</h2>
-                              <span>Move each bag run through advertising, artwork and print.</span>
+                              <span>Create future runs, control sales and move each bag run through advertising, artwork and print.</span>
                             </div>
+                            <button className="admin-primary-action" onClick={() => openRunEditor('create')}>
+                              <Plus size={16} /> New production run
+                            </button>
                           </div>
 
                           <div className="admin-production-grid">
@@ -3981,9 +4159,13 @@ export default function App() {
                                 <article className="admin-production-card" key={item.id}>
                                   <div className="admin-production-title">
                                     <div><strong>{bag?.name ?? 'Bag'}</strong><span>{item.run_code}</span></div>
-                                    <span className={`admin-status ${printReady ? 'admin-status-approved' : 'admin-status-pending'}`}>
-                                      {printReady ? 'Print ready' : `${artworkOutstanding} artwork pending`}
-                                    </span>
+                                    <div className="admin-run-badges">
+                                      {item.archived_at && <span className="admin-status admin-status-cancelled">Archived</span>}
+                                      {!item.archived_at && item.sales_paused && <span className="admin-status admin-status-pending">Sales paused</span>}
+                                      <span className={`admin-status ${printReady ? 'admin-status-approved' : 'admin-status-pending'}`}>
+                                        {printReady ? 'Print ready' : `${artworkOutstanding} artwork pending`}
+                                      </span>
+                                    </div>
                                   </div>
                                   <div className="admin-production-sales">
                                     <div><span>{stage}</span><strong>{soldPercent}% sold</strong></div>
@@ -4021,7 +4203,11 @@ export default function App() {
                                       </select>
                                     </label>
                                   </div>
-                                  <div className="admin-production-actions">
+                                  <div className="admin-production-actions admin-production-management-actions">
+                                    <button onClick={() => openRunEditor('edit', item)}>Edit run</button>
+                                    <button onClick={() => openRunEditor('duplicate', item)}>Duplicate</button>
+                                    {!item.archived_at && <button onClick={() => void toggleRunPause(item)}>{item.sales_paused ? 'Resume sales' : 'Pause sales'}</button>}
+                                    {!item.archived_at && <button className="danger" onClick={() => void archiveRun(item)}>Archive</button>}
                                     <button onClick={() => updateRunDetails(item)}>Update advertiser message</button>
                                     <button
                                       className="primary"
@@ -4260,6 +4446,66 @@ export default function App() {
                 )}
               </>
             )}
+          </section>
+        </div>
+      )}
+
+
+      {runEditorOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => !runEditorSaving && setRunEditorOpen(false)}>
+          <section
+            className="checkout-modal admin-run-editor"
+            role="dialog"
+            aria-modal="true"
+            aria-label={runEditorMode === 'edit' ? 'Edit production run' : runEditorMode === 'duplicate' ? 'Duplicate production run' : 'Create production run'}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" disabled={runEditorSaving} onClick={() => setRunEditorOpen(false)} aria-label="Close">
+              <X size={20} />
+            </button>
+            <p className="kicker">PRODUCTION RUN</p>
+            <h2>{runEditorMode === 'edit' ? 'Edit production run.' : runEditorMode === 'duplicate' ? 'Duplicate production run.' : 'Create a new production run.'}</h2>
+            <p className="checkout-intro">
+              New and duplicated runs start as paused drafts. Their advertising grid is generated automatically from the selected bag size.
+            </p>
+            <form className="takeaway-form admin-run-form" onSubmit={saveRunEditor}>
+              <div className="form-grid">
+                <label>
+                  Run code
+                  <input required value={runEditor.runCode} onChange={(event) => setRunEditor({ ...runEditor, runCode: event.target.value.toUpperCase() })} />
+                </label>
+                <label>
+                  Bag size
+                  <select required value={runEditor.bagSizeId} onChange={(event) => setRunEditor({ ...runEditor, bagSizeId: event.target.value })}>
+                    <option value="">Choose bag size</option>
+                    {adminBagSizes.map((bag) => <option value={bag.id} key={bag.id}>{bag.name} · {bag.total_square_count} ad spaces</option>)}
+                  </select>
+                </label>
+                <label>
+                  Estimated start
+                  <input type="date" value={runEditor.estimatedStartDate} onChange={(event) => setRunEditor({ ...runEditor, estimatedStartDate: event.target.value })} />
+                </label>
+                <label>
+                  Bags in run
+                  <input type="number" min="1" step="1" placeholder="e.g. 25000" value={runEditor.bagQuantity} onChange={(event) => setRunEditor({ ...runEditor, bagQuantity: event.target.value })} />
+                </label>
+                <label>
+                  Advert price per 3cm square
+                  <input type="number" min="0" step="0.01" value={runEditor.price} onChange={(event) => setRunEditor({ ...runEditor, price: event.target.value })} />
+                </label>
+                <label>
+                  Reservation time (minutes)
+                  <input type="number" min="1" max="120" step="1" value={runEditor.reservationMinutes} onChange={(event) => setRunEditor({ ...runEditor, reservationMinutes: event.target.value })} />
+                </label>
+              </div>
+              <div className="admin-run-editor-summary">
+                <strong>Starts safely</strong>
+                <span>Status: Draft · Advertising sales: Paused</span>
+              </div>
+              <button className="button button-dark modal-primary" disabled={runEditorSaving}>
+                {runEditorSaving ? 'Saving…' : runEditorMode === 'edit' ? 'Save changes' : 'Create production run'}
+              </button>
+            </form>
           </section>
         </div>
       )}
