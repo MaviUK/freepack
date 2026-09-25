@@ -1740,6 +1740,7 @@ export default function App() {
       setAdminBookings(bookings)
       setAdminOrders((ordersResult.data ?? []) as AdminOrder[])
       setAdminCustomers((customersResult.data ?? []) as AdminCustomer[])
+      setAdminBagSizes((bagSizesResult.data ?? []) as AdminBagSize[])
       const adminRunsData = (runsResult.data ?? []) as AdminRun[]
       setAdminRuns(adminRunsData)
 
