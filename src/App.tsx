@@ -1689,6 +1689,7 @@ export default function App() {
           .select(`
             id,
             run_code,
+            bag_size_id,
             status,
             status_updated_at,
             status_note,
@@ -1696,6 +1697,9 @@ export default function App() {
             estimated_start_date,
             price_per_square_pence,
             bag_quantity,
+            reservation_minutes,
+            sales_paused,
+            archived_at,
             bag_sizes (
               name,
               total_square_count,
@@ -1710,6 +1714,11 @@ export default function App() {
           `)
           .order('run_code'),
         (supabase as any).rpc('admin_list_customers'),
+        supabase
+          .from('bag_sizes')
+          .select('id,code,name,bags_per_box,total_square_count')
+          .eq('active', true)
+          .order('sort_order'),
       ])
 
       if (cancelled) return
@@ -1720,6 +1729,7 @@ export default function App() {
           ordersResult.error?.message ??
           runsResult.error?.message ??
           customersResult.error?.message ??
+          bagSizesResult.error?.message ??
           'Could not load admin data.',
         )
         setAdminLoading(false)
@@ -2269,7 +2279,7 @@ export default function App() {
     setAdminMessage(`${run.run_code} archived.`)
   }
 
-  async function updateRunStatus(runDbId: string, status: 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
+  async function updateRunStatus(runDbId: string, status: 'draft' | 'selling' | 'funded' | 'artwork_review' | 'sent_to_print' | 'printing' | 'shipping' | 'in_stock' | 'distributing' | 'completed') {
     setAdminMessage('')
 
     if (['sent_to_print', 'printing', 'shipping', 'in_stock', 'distributing', 'completed'].includes(status)) {
@@ -2400,6 +2410,8 @@ export default function App() {
           )
         `)
         .in('status', ['selling', 'funded', 'artwork_review', 'sent_to_print', 'printing', 'shipping', 'in_stock', 'distributing'])
+        .eq('sales_paused', false)
+        .is('archived_at', null)
         .order('run_code')
 
       if (runsError || !runRows) {
@@ -4191,6 +4203,7 @@ export default function App() {
                                     <label>
                                       Current stage
                                       <select value={item.status} onChange={(event) => updateRunStatus(item.id, event.target.value as any)}>
+                                        <option value="draft">Draft</option>
                                         <option value="selling">Recruiting advertisers</option>
                                         <option value="funded">Advertising sold</option>
                                         <option value="artwork_review">Artwork approval</option>
