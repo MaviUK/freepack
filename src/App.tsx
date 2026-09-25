@@ -1034,6 +1034,8 @@ export default function App() {
   const [adminExportingRun, setAdminExportingRun] = useState<string | null>(null)
   const [adminArtworkUrls, setAdminArtworkUrls] = useState<Record<string, string>>({})
   const [takeawayCheckoutOpen, setTakeawayCheckoutOpen] = useState(false)
+  const [takeawayApprovalRequired, setTakeawayApprovalRequired] = useState(false)
+  const [takeawayApprovalSubmitted, setTakeawayApprovalSubmitted] = useState(false)
   const [takeawaySubmitting, setTakeawaySubmitting] = useState(false)
   const [takeawayMessage, setTakeawayMessage] = useState('')
   const [takeawayOrderId, setTakeawayOrderId] = useState<string | null>(null)
@@ -1904,6 +1906,27 @@ export default function App() {
 
     setAccountError('')
     setReplacementUploading(null)
+  }
+
+
+  async function approveTakeawayBusiness(customer: AdminCustomer) {
+    if (!customer.takeaway_business_id) return
+
+    const approvedAt = new Date().toISOString()
+    const { error } = await supabase
+      .from('takeaway_businesses')
+      .update({ verified_at: approvedAt, updated_at: approvedAt })
+      .eq('id', customer.takeaway_business_id)
+
+    if (error) {
+      setAdminMessage(error.message)
+      return
+    }
+
+    setAdminCustomers((current) => current.map((item) =>
+      item.user_id === customer.user_id ? { ...item, verified_at: approvedAt } : item,
+    ))
+    setAdminMessage(`${customer.business_name ?? 'Business'} approved. They can now order FreePack bags.`)
   }
 
   async function updateOrderStatus(orderId: string, status: 'approved' | 'dispatching' | 'dispatched' | 'completed' | 'cancelled') {
@@ -3022,17 +3045,74 @@ export default function App() {
     setAuthLoading(false)
   }
 
-  function openTakeawayCheckout() {
+  async function openTakeawayCheckout() {
     if (totalBoxes === 0) return
     if (!userId) {
       setAuthMode('signup')
       setAuthReturnTo('takeaway')
       setAuthOpen(true)
-      setAuthMessage('Create an account or sign in before placing a free bag order.')
+      setAuthMessage('Create an account or sign in before applying for FreePack bags.')
       return
     }
+
     setTakeawayMessage('')
+    setTakeawayApprovalSubmitted(false)
+
+    const { data: businesses, error } = await supabase
+      .from('takeaway_businesses')
+      .select('id,business_name,phone,address_line_1,address_line_2,town_city,postcode,verified_at')
+      .eq('owner_user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    if (error) {
+      setTakeawayMessage(error.message)
+      setTakeawayCheckoutOpen(true)
+      return
+    }
+
+    const business = businesses?.[0]
+    if (business) {
+      setTakeawayDetails((current) => ({
+        ...current,
+        businessName: business.business_name ?? '',
+        phone: business.phone ?? '',
+        address1: business.address_line_1 ?? '',
+        address2: business.address_line_2 ?? '',
+        townCity: business.town_city ?? '',
+        postcode: business.postcode ?? '',
+      }))
+    }
+
+    setTakeawayApprovalRequired(!business?.verified_at)
     setTakeawayCheckoutOpen(true)
+  }
+
+  async function submitTakeawayApproval(event: React.FormEvent) {
+    event.preventDefault()
+    if (!userId) return
+
+    setTakeawaySubmitting(true)
+    setTakeawayMessage('')
+
+    const { error } = await (supabase as any).rpc('request_takeaway_business_approval', {
+      p_business_name: takeawayDetails.businessName,
+      p_phone: takeawayDetails.phone,
+      p_address_line_1: takeawayDetails.address1,
+      p_address_line_2: takeawayDetails.address2,
+      p_town_city: takeawayDetails.townCity,
+      p_postcode: takeawayDetails.postcode,
+    })
+
+    if (error) {
+      setTakeawayMessage(error.message ?? 'Could not submit approval request.')
+      setTakeawaySubmitting(false)
+      return
+    }
+
+    setTakeawayApprovalSubmitted(true)
+    setTakeawayMessage('')
+    setTakeawaySubmitting(false)
   }
 
   async function submitTakeawayOrder(event: React.FormEvent) {
@@ -3099,7 +3179,7 @@ export default function App() {
     }
 
     setTakeawayOrderId(order.id)
-    setTakeawayMessage('Order submitted. We’ll verify the business and confirm availability before dispatch.')
+    setTakeawayMessage('Order submitted. We’ll confirm stock availability before dispatch.')
     setTakeawaySubmitting(false)
     setBagBoxes((current) => Object.fromEntries(Object.keys(current).map((key) => [key, 0])))
   }
@@ -3465,11 +3545,11 @@ export default function App() {
                 <button
                   className="button button-dark takeaway-continue"
                   disabled={totalBoxes === 0}
-                  onClick={openTakeawayCheckout}
+                  onClick={() => void openTakeawayCheckout()}
                 >
-                  Continue with order <ArrowRight size={17} />
+                  Continue <ArrowRight size={17} />
                 </button>
-                <small className="summary-note">Orders are reviewed for business verification and stock availability before dispatch.</small>
+                <small className="summary-note">Only FreePack-approved businesses can order bags. New businesses can apply for approval after signing in.</small>
               </aside>
             </div>
           </section>
@@ -4388,6 +4468,9 @@ export default function App() {
                                         <span>#{customer.user_id.slice(0, 8).toUpperCase()}</span>
                                         <div>
                                           {customer.email && <a href={`mailto:${customer.email}`}>Email customer</a>}
+                                          {isTakeaway && customer.takeaway_business_id && !customer.verified_at && (
+                                            <button onClick={() => void approveTakeawayBusiness(customer)}>Approve business</button>
+                                          )}
                                           {isTakeaway && customer.takeaway_business_id && (
                                             <button onClick={() => setAdminSection('orders')}>View orders</button>
                                           )}
@@ -5037,7 +5120,7 @@ export default function App() {
 
             <div className="checkout-icon"><Truck size={22} /></div>
             <p className="kicker">FREE BAG ORDER</p>
-            <h2>{takeawayOrderId ? 'Order received' : 'Delivery details'}</h2>
+            <h2>{takeawayOrderId ? 'Order received' : takeawayApprovalRequired ? 'Business approval' : 'Delivery details'}</h2>
 
             {takeawayOrderId ? (
               <>
@@ -5049,7 +5132,7 @@ export default function App() {
                   </div>
                 </div>
                 <p className="checkout-intro">
-                  Your bags remain free. The order is awaiting business verification and stock confirmation.
+                  Your bags remain free. Your approved business order is awaiting stock confirmation and dispatch.
                 </p>
                 <button
                   className="button button-dark modal-primary"
@@ -5062,6 +5145,67 @@ export default function App() {
                   Done
                 </button>
               </>
+            ) : takeawayApprovalRequired ? (
+              takeawayApprovalSubmitted ? (
+                <>
+                  <div className="order-success">
+                    <Check size={22} />
+                    <div>
+                      <strong>Approval request sent</strong>
+                      <span>FreePack will review your business details.</span>
+                    </div>
+                  </div>
+                  <p className="checkout-intro">
+                    Once your business is approved, sign back in and you’ll be able to order available FreePack bags.
+                  </p>
+                  <button
+                    className="button button-dark modal-primary"
+                    onClick={() => {
+                      setTakeawayCheckoutOpen(false)
+                      setTakeawayApprovalSubmitted(false)
+                    }}
+                  >
+                    Done
+                  </button>
+                </>
+              ) : (
+                <form className="takeaway-form" onSubmit={submitTakeawayApproval}>
+                  <p className="checkout-intro">
+                    FreePack bags are only available to approved businesses. Send us your business details first; no bag order or shipping payment will be created until you are approved.
+                  </p>
+                  <div className="form-grid">
+                    <label className="full">
+                      Business name
+                      <input required value={takeawayDetails.businessName} onChange={(event) => setTakeawayDetails({ ...takeawayDetails, businessName: event.target.value })} />
+                    </label>
+                    <label>
+                      Phone
+                      <input value={takeawayDetails.phone} onChange={(event) => setTakeawayDetails({ ...takeawayDetails, phone: event.target.value })} />
+                    </label>
+                    <label>
+                      Postcode
+                      <input required value={takeawayDetails.postcode} onChange={(event) => setTakeawayDetails({ ...takeawayDetails, postcode: event.target.value })} />
+                    </label>
+                    <label className="full">
+                      Address line 1
+                      <input required value={takeawayDetails.address1} onChange={(event) => setTakeawayDetails({ ...takeawayDetails, address1: event.target.value })} />
+                    </label>
+                    <label className="full">
+                      Address line 2
+                      <input value={takeawayDetails.address2} onChange={(event) => setTakeawayDetails({ ...takeawayDetails, address2: event.target.value })} />
+                    </label>
+                    <label className="full">
+                      Town / city
+                      <input value={takeawayDetails.townCity} onChange={(event) => setTakeawayDetails({ ...takeawayDetails, townCity: event.target.value })} />
+                    </label>
+                  </div>
+                  {takeawayMessage && <div className="auth-message">{takeawayMessage}</div>}
+                  <button className="button button-dark modal-primary" disabled={takeawaySubmitting}>
+                    {takeawaySubmitting ? 'Sending…' : 'Apply for approval'}
+                  </button>
+                  <small className="summary-note">We’ll review the business before enabling free bag ordering on this account.</small>
+                </form>
+              )
             ) : (
               <form className="takeaway-form" onSubmit={submitTakeawayOrder}>
                 <div className="takeaway-order-mini-summary">
@@ -5139,7 +5283,7 @@ export default function App() {
                       : 'Submit free bag order'}
                 </button>
                 <small className="summary-note">
-                  Orders are reviewed before dispatch so we can verify the takeaway and manage fair stock allocation.
+                  Your business is approved. Orders are still checked for stock availability and fair allocation before dispatch.
                 </small>
               </form>
             )}
