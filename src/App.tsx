@@ -285,10 +285,10 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'S-001',
     size: 'Small',
-    dimensions: '124 × 78 × 234 mm',
-    faceWidth: 124,
-    sideWidth: 78,
-    height: 234,
+    dimensions: '118 × 80 × 245 mm',
+    faceWidth: 118,
+    sideWidth: 80,
+    height: 245,
     totalBagSquares: 48,
     estimatedStart: 'December 2026',
     soldByPanel: {
@@ -301,11 +301,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'M-001',
     size: 'Medium',
-    dimensions: '149 × 100 × 310 mm',
-    faceWidth: 149,
-    sideWidth: 100,
-    height: 310,
-    totalBagSquares: 80,
+    dimensions: '180 × 120 × 337 mm',
+    faceWidth: 180,
+    sideWidth: 120,
+    height: 337,
+    totalBagSquares: 126,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -317,11 +317,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'L-001',
     size: 'Large',
-    dimensions: '173 × 112 × 343 mm',
-    faceWidth: 173,
-    sideWidth: 112,
-    height: 343,
-    totalBagSquares: 108,
+    dimensions: '247 × 142 × 395 mm',
+    faceWidth: 247,
+    sideWidth: 142,
+    height: 395,
+    totalBagSquares: 198,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -333,11 +333,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'XL-001',
     size: 'XL',
-    dimensions: '314 × 160 × 440 mm',
-    faceWidth: 314,
-    sideWidth: 160,
-    height: 440,
-    totalBagSquares: 312,
+    dimensions: '320 × 173 × 450 mm',
+    faceWidth: 320,
+    sideWidth: 173,
+    height: 450,
+    totalBagSquares: 338,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -820,10 +820,10 @@ function gridCount(widthMm: number, heightMm: number) {
 }
 
 const CURRENT_BAG_GEOMETRY: Record<BagRun['size'], Pick<BagRun, 'dimensions' | 'faceWidth' | 'sideWidth' | 'height'>> = {
-  Small: { dimensions: '124 × 78 × 234 mm', faceWidth: 124, sideWidth: 78, height: 234 },
-  Medium: { dimensions: '149 × 100 × 310 mm', faceWidth: 149, sideWidth: 100, height: 310 },
-  Large: { dimensions: '173 × 112 × 343 mm', faceWidth: 173, sideWidth: 112, height: 343 },
-  XL: { dimensions: '314 × 160 × 440 mm', faceWidth: 314, sideWidth: 160, height: 440 },
+  Small: { dimensions: '118 × 80 × 245 mm', faceWidth: 118, sideWidth: 80, height: 245 },
+  Medium: { dimensions: '180 × 120 × 337 mm', faceWidth: 180, sideWidth: 120, height: 337 },
+  Large: { dimensions: '247 × 142 × 395 mm', faceWidth: 247, sideWidth: 142, height: 395 },
+  XL: { dimensions: '320 × 173 × 450 mm', faceWidth: 320, sideWidth: 173, height: 450 },
 }
 
 function totalGridSpaces(faceWidth: number, sideWidth: number, height: number) {
