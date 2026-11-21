@@ -14,7 +14,7 @@ export const BRAND_TO_AD_GAP_MM = 3
 
 export const BRAND_GAP_AFTER_ROW_BY_SIZE: Record<BagSizeName, number | null> = {
   Small: 3,
-  Medium: 4,
+  Medium: 3,
   Large: 4,
   XL: 5,
 }
