@@ -321,7 +321,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 150,
     height: 420,
-    totalBagSquares: 212,
+    totalBagSquares: 236,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
