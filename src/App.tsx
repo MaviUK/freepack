@@ -305,7 +305,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 180,
     sideWidth: 120,
     height: 337,
-    totalBagSquares: 126,
+    totalBagSquares: 140,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -827,14 +827,14 @@ const CURRENT_BAG_GEOMETRY: Record<BagRun['size'], Pick<BagRun, 'dimensions' | '
 }
 
 function totalGridSpaces(faceWidth: number, sideWidth: number, height: number) {
-  const face = faceWidth === 247 && height === 395 ? { cols: 7, rows: 10 } : gridCount(faceWidth, height)
+  const face = faceWidth === 247 && height === 395 ? { cols: 7, rows: 10 } : faceWidth === 180 && height === 337 ? { cols: 5, rows: 8 } : gridCount(faceWidth, height)
   const side = gridCount(sideWidth, height)
   return 2 * (face.cols * face.rows + side.cols * side.rows)
 }
 
 function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
   const defaultFace = gridCount(run.faceWidth, run.height)
-  const face = run.size === 'Large' ? { cols: 7, rows: 10 } : defaultFace
+  const face = run.size === 'Large' ? { cols: 7, rows: 10 } : run.size === 'Medium' ? { cols: 5, rows: 8 } : defaultFace
   const defaultSide = gridCount(run.sideWidth, run.height)
   const side = defaultSide
 
