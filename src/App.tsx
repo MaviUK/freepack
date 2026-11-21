@@ -305,7 +305,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 180,
     sideWidth: 120,
     height: 360,
-    totalBagSquares: 160,
+    totalBagSquares: 166,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -321,7 +321,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 150,
     height: 420,
-    totalBagSquares: 264,
+    totalBagSquares: 272,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -337,7 +337,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 320,
     sideWidth: 180,
     height: 480,
-    totalBagSquares: 364,
+    totalBagSquares: 402,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -814,8 +814,9 @@ function LegalPage({ page }: { page: LegalPageKey }) {
 }
 
 function gridCount(widthMm: number, heightMm: number) {
-  const cols = Math.floor((widthMm - 20 + 3) / 33)
-  const rows = Math.floor((heightMm - 20 + 3) / 33)
+  // Maximise 30 mm cells while keeping 10 mm clear on all four panel edges.
+  const cols = Math.floor((widthMm - 20) / 30)
+  const rows = Math.floor((heightMm - 20) / 30)
   return { cols: Math.max(1, cols), rows: Math.max(1, rows) }
 }
 
