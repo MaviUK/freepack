@@ -305,7 +305,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 149,
     sideWidth: 100,
     height: 310,
-    totalBagSquares: 96,
+    totalBagSquares: 80,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -817,6 +817,19 @@ function gridCount(widthMm: number, heightMm: number) {
   const cols = Math.floor((widthMm - 20 + 3) / 33)
   const rows = Math.floor((heightMm - 20 + 3) / 33)
   return { cols: Math.max(1, cols), rows: Math.max(1, rows) }
+}
+
+const CURRENT_BAG_GEOMETRY: Record<BagRun['size'], Pick<BagRun, 'dimensions' | 'faceWidth' | 'sideWidth' | 'height'>> = {
+  Small: { dimensions: '124 × 78 × 234 mm', faceWidth: 124, sideWidth: 78, height: 234 },
+  Medium: { dimensions: '149 × 100 × 310 mm', faceWidth: 149, sideWidth: 100, height: 310 },
+  Large: { dimensions: '173 × 112 × 343 mm', faceWidth: 173, sideWidth: 112, height: 343 },
+  XL: { dimensions: '314 × 160 × 440 mm', faceWidth: 314, sideWidth: 160, height: 440 },
+}
+
+function totalGridSpaces(faceWidth: number, sideWidth: number, height: number) {
+  const face = gridCount(faceWidth, height)
+  const side = gridCount(sideWidth, height)
+  return 2 * (face.cols * face.rows + side.cols * side.rows)
 }
 
 function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
@@ -2474,11 +2487,12 @@ export default function App() {
           id: row.run_code,
           dbId: row.id,
           size: bag.name as BagRun['size'],
-          dimensions: `${bag.front_width_mm} × ${bag.front_width_mm + bag.side_gusset_mm} × ${bag.height_mm} mm`,
-          faceWidth: bag.front_width_mm,
-          sideWidth: bag.side_gusset_mm,
-          height: bag.height_mm,
-          totalBagSquares: bag.total_square_count,
+          ...CURRENT_BAG_GEOMETRY[bag.name as BagRun['size']],
+          totalBagSquares: totalGridSpaces(
+            CURRENT_BAG_GEOMETRY[bag.name as BagRun['size']].faceWidth,
+            CURRENT_BAG_GEOMETRY[bag.name as BagRun['size']].sideWidth,
+            CURRENT_BAG_GEOMETRY[bag.name as BagRun['size']].height,
+          ),
           estimatedStart: start,
           pricePerSquarePence: row.price_per_square_pence,
           soldByPanel,
