@@ -285,11 +285,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'S-001',
     size: 'Small',
-    dimensions: '150 × 215 × 300 mm',
-    faceWidth: 150,
-    sideWidth: 65,
-    height: 300,
-    totalBagSquares: 80,
+    dimensions: '124 × 78 × 234 mm',
+    faceWidth: 124,
+    sideWidth: 78,
+    height: 234,
+    totalBagSquares: 48,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '4-0', '5-0'],
@@ -301,11 +301,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'M-001',
     size: 'Medium',
-    dimensions: '175 × 288 × 350 mm',
-    faceWidth: 175,
-    sideWidth: 113,
-    height: 350,
-    totalBagSquares: 160,
+    dimensions: '149 × 100 × 310 mm',
+    faceWidth: 149,
+    sideWidth: 100,
+    height: 310,
+    totalBagSquares: 96,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -317,11 +317,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'L-001',
     size: 'Large',
-    dimensions: '200 × 315 × 375 mm',
-    faceWidth: 200,
-    sideWidth: 115,
-    height: 375,
-    totalBagSquares: 186,
+    dimensions: '173 × 112 × 343 mm',
+    faceWidth: 173,
+    sideWidth: 112,
+    height: 343,
+    totalBagSquares: 108,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -333,11 +333,11 @@ const BAG_RUNS: BagRun[] = [
   {
     id: 'XL-001',
     size: 'XL',
-    dimensions: '250 × 388 × 413 mm',
-    faceWidth: 250,
-    sideWidth: 138,
-    height: 413,
-    totalBagSquares: 240,
+    dimensions: '314 × 160 × 440 mm',
+    faceWidth: 314,
+    sideWidth: 160,
+    height: 440,
+    totalBagSquares: 312,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -821,18 +821,9 @@ function gridCount(widthMm: number, heightMm: number) {
 
 function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
   const defaultFace = gridCount(run.faceWidth, run.height)
-  const face = run.size === 'Medium'
-    ? { cols: 5, rows: 10 }
-    : run.size === 'Large'
-      ? { cols: 6, rows: 10 }
-      : defaultFace
-
+  const face = defaultFace
   const defaultSide = gridCount(run.sideWidth, run.height)
-  const side = run.size === 'Medium'
-    ? { cols: 3, rows: 10 }
-    : run.size === 'Large'
-      ? { cols: 3, rows: 11 }
-      : defaultSide
+  const side = defaultSide
 
   return {
     front: { label: 'Front', shortLabel: 'Front', cols: face.cols, rows: face.rows, widthMm: run.faceWidth },
