@@ -13,10 +13,10 @@ export const VERTICAL_EDGE_MARGIN_MM = 6
 export const BRAND_TO_AD_GAP_MM = 3
 
 export const BRAND_GAP_AFTER_ROW_BY_SIZE: Record<BagSizeName, number | null> = {
-  Small: 2,
-  Medium: 3,
-  Large: 4,
-  XL: 5,
+  Small: -1,
+  Medium: -1,
+  Large: -1,
+  XL: -1,
 }
 
 export function panelLayout(
@@ -62,6 +62,33 @@ export function panelLayout(
       rowYmm,
       brandZoneTopMm: null as number | null,
       brandZoneHeightMm: 0,
+    }
+  }
+
+  // A negative brand gap positions the 30 mm FreePack logo above the first advert row.
+  // The advertising cells form one uninterrupted, top-aligned grid.
+  if (!brandRows.length && brandGapAfterRow === -1) {
+    const brandZoneHeightMm = AD_CELL_MM
+    const brandZoneTopMm = VERTICAL_EDGE_MARGIN_MM
+    const advertTopMm = brandZoneTopMm + brandZoneHeightMm + BRAND_TO_AD_GAP_MM
+    const availableHeight = heightMm - VERTICAL_EDGE_MARGIN_MM - advertTopMm
+    const verticalGapMm = config.rows <= 1 ? 0 : Math.min(
+      MAX_GAP_MM,
+      Math.max(0, (availableHeight - config.rows * AD_CELL_MM) / (config.rows - 1)),
+    )
+    for (let row = 0; row < config.rows; row += 1) {
+      rowYmm[row] = advertTopMm + row * (AD_CELL_MM + verticalGapMm)
+    }
+    return {
+      gridWidthMm,
+      gridHeightMm: config.rows * AD_CELL_MM + Math.max(0, config.rows - 1) * verticalGapMm,
+      offsetXmm,
+      offsetYmm: advertTopMm,
+      stepMm: stepXmm,
+      horizontalGapMm,
+      rowYmm,
+      brandZoneTopMm,
+      brandZoneHeightMm,
     }
   }
 
