@@ -9,7 +9,7 @@ export type BagSizeName = 'Small' | 'Medium' | 'Large' | 'XL'
 export const AD_CELL_MM = 30
 export const MAX_GAP_MM = 3
 export const SAFE_MARGIN_MM = 10
-export const VERTICAL_EDGE_MARGIN_MM = 6
+export const VERTICAL_EDGE_MARGIN_MM = SAFE_MARGIN_MM
 export const BRAND_TO_AD_GAP_MM = 3
 
 export const BRAND_GAP_AFTER_ROW_BY_SIZE: Record<BagSizeName, number | null> = {
@@ -45,11 +45,13 @@ export function panelLayout(
   const rowYmm = Array.from({ length: config.rows }, () => 0)
 
   if (!brandRows.length && brandGapAfterRow === null) {
-    const gridHeightMm = config.rows * AD_CELL_MM + Math.max(0, config.rows - 1) * MAX_GAP_MM
+    const availableHeight = heightMm - 2 * VERTICAL_EDGE_MARGIN_MM
+    const verticalGapMm = config.rows <= 1 ? 0 : Math.min(MAX_GAP_MM, Math.max(0, (availableHeight - config.rows * AD_CELL_MM) / (config.rows - 1)))
+    const gridHeightMm = config.rows * AD_CELL_MM + Math.max(0, config.rows - 1) * verticalGapMm
     const offsetYmm = Math.max(VERTICAL_EDGE_MARGIN_MM, (heightMm - gridHeightMm) / 2)
 
     for (let row = 0; row < config.rows; row += 1) {
-      rowYmm[row] = offsetYmm + row * (AD_CELL_MM + MAX_GAP_MM)
+      rowYmm[row] = offsetYmm + row * (AD_CELL_MM + verticalGapMm)
     }
 
     return {
