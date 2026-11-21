@@ -13,7 +13,7 @@ export const VERTICAL_EDGE_MARGIN_MM = 6
 export const BRAND_TO_AD_GAP_MM = 3
 
 export const BRAND_GAP_AFTER_ROW_BY_SIZE: Record<BagSizeName, number | null> = {
-  Small: 3,
+  Small: 2,
   Medium: 3,
   Large: 4,
   XL: 5,
@@ -66,7 +66,7 @@ export function panelLayout(
   }
 
   const sortedBrandRows = [...brandRows].sort((a, b) => a - b)
-  const brandZoneHeightMm = sortedBrandRows.length > 1 ? 48 : 22
+  const brandZoneHeightMm = sortedBrandRows.length > 1 ? 48 : 30
   const brandZoneTopMm = (heightMm - brandZoneHeightMm) / 2
   const brandZoneBottomMm = brandZoneTopMm + brandZoneHeightMm
 
