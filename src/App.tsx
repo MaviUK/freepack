@@ -305,7 +305,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 180,
     sideWidth: 120,
     height: 360,
-    totalBagSquares: 140,
+    totalBagSquares: 160,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-2', '0-3', '1-2', '1-3', '5-0', '5-1', '6-0', '6-1'],
@@ -321,7 +321,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 250,
     sideWidth: 150,
     height: 420,
-    totalBagSquares: 236,
+    totalBagSquares: 264,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-3', '0-4', '1-3', '1-4', '4-0', '4-1', '5-0', '5-1', '8-3', '8-4', '9-3', '9-4'],
@@ -337,7 +337,7 @@ const BAG_RUNS: BagRun[] = [
     faceWidth: 320,
     sideWidth: 180,
     height: 480,
-    totalBagSquares: 328,
+    totalBagSquares: 364,
     estimatedStart: 'December 2026',
     soldByPanel: {
       front: ['0-5', '0-6', '1-5', '1-6', '4-0', '4-1', '5-0', '5-1', '9-4', '9-5', '10-4', '10-5'],
@@ -827,14 +827,18 @@ const CURRENT_BAG_GEOMETRY: Record<BagRun['size'], Pick<BagRun, 'dimensions' | '
 }
 
 function totalGridSpaces(faceWidth: number, sideWidth: number, height: number) {
-  const face = faceWidth === 250 && height === 420 ? { cols: 7, rows: 10 } : faceWidth === 180 && height === 360 ? { cols: 5, rows: 8 } : faceWidth === 320 && height === 480 ? { cols: 9, rows: 12 } : faceWidth === 130 && height === 270 ? { cols: 3, rows: 6 } : gridCount(faceWidth, height)
+  const face = faceWidth === 250 && height === 420 ? { cols: 7, rows: 12 }
+    : faceWidth === 180 && height === 360 ? { cols: 5, rows: 10 }
+    : faceWidth === 320 && height === 480 ? { cols: 9, rows: 14 }
+    : faceWidth === 130 && height === 270 ? { cols: 3, rows: 7 }
+    : gridCount(faceWidth, height)
   const side = gridCount(sideWidth, height)
   return 2 * (face.cols * face.rows + side.cols * side.rows)
 }
 
 function panelsForRun(run: BagRun): Record<PanelKey, PanelConfig> {
   const defaultFace = gridCount(run.faceWidth, run.height)
-  const face = run.size === 'Large' ? { cols: 7, rows: 10 } : run.size === 'Medium' ? { cols: 5, rows: 8 } : run.size === 'XL' ? { cols: 9, rows: 12 } : run.size === 'Small' ? { cols: 3, rows: 6 } : defaultFace
+  const face = run.size === 'Large' ? { cols: 7, rows: 12 } : run.size === 'Medium' ? { cols: 5, rows: 10 } : run.size === 'XL' ? { cols: 9, rows: 14 } : run.size === 'Small' ? { cols: 3, rows: 7 } : defaultFace
   const defaultSide = gridCount(run.sideWidth, run.height)
   const side = defaultSide
 
